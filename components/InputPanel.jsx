@@ -1,0 +1,300 @@
+'use client';
+
+import { useEffect, useRef, useState } from 'react';
+import { ChevronDown, FolderOpen, Plus } from 'lucide-react';
+import {
+  Card,
+  Field,
+  TextInput,
+  NumberInput,
+  Select,
+  Segmented,
+  Toggle,
+} from '@/components/ui/primitives';
+import { cn } from '@/lib/utils';
+
+function Section({ title, children }) {
+  return (
+    <Card className="border-blue-200 bg-blue-50 p-4">
+      <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+        {title}
+      </h3>
+      <div className="space-y-3">{children}</div>
+    </Card>
+  );
+}
+
+// Combined name field + saved-projects dropdown: type to name/rename the
+// current project, or open the menu to load a saved one.
+function ProjectNameField({ value, onChange, projects, currentProjectId, onSelectProject }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDocClick = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, [open]);
+
+  return (
+    <div className="relative" ref={ref}>
+      <div className="flex">
+        <TextInput
+          value={value}
+          onChange={onChange}
+          placeholder="e.g. Harborview Hotel"
+          className="rounded-r-none"
+        />
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          aria-label="Open saved projects"
+          className="inline-flex h-9 shrink-0 items-center justify-center rounded-r-lg border border-l-0 border-slate-200 bg-white px-2 text-slate-500 shadow-sm transition-colors hover:bg-slate-50 hover:text-slate-700"
+        >
+          <ChevronDown size={16} className={cn('transition-transform', open && 'rotate-180')} />
+        </button>
+      </div>
+
+      {open && (
+        <div className="absolute left-0 right-0 z-30 mt-1.5 max-h-72 overflow-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg shadow-slate-900/10">
+          <button
+            type="button"
+            onClick={() => {
+              onSelectProject('');
+              setOpen(false);
+            }}
+            className={cn(
+              'flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm transition-colors hover:bg-slate-100',
+              !currentProjectId ? 'font-medium text-blue-600' : 'text-slate-700'
+            )}
+          >
+            <Plus size={15} /> New Project
+          </button>
+
+          {projects.length > 0 ? (
+            <>
+              <div className="my-1 h-px bg-slate-100" />
+              <p className="px-2.5 pb-1 pt-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                Saved Projects
+              </p>
+              {projects.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => {
+                    onSelectProject(p.id);
+                    setOpen(false);
+                  }}
+                  className={cn(
+                    'flex w-full items-center gap-2 truncate rounded-lg px-2.5 py-2 text-left text-sm transition-colors hover:bg-slate-100',
+                    p.id === currentProjectId
+                      ? 'bg-blue-50 font-medium text-blue-700'
+                      : 'text-slate-700'
+                  )}
+                >
+                  <FolderOpen size={15} className="shrink-0 text-slate-400" />
+                  <span className="truncate">{p.project_name}</span>
+                </button>
+              ))}
+            </>
+          ) : (
+            <p className="px-2.5 py-2 text-xs text-slate-400">
+              No saved projects yet — name this one and click Save Project.
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function InputPanel({
+  inputs,
+  setInputs,
+  term,
+  projects = [],
+  currentProjectId = null,
+  onSelectProject = () => {},
+}) {
+  const set = (field, value) => setInputs((prev) => ({ ...prev, [field]: value }));
+
+  const isWifi7 = inputs.wifiGeneration === 'wifi7';
+
+  // Enforce: Wi-Fi 7 forces hallway deployment (mirrors engine fix #8).
+  useEffect(() => {
+    if (isWifi7 && inputs.deploymentType === 'inroom') {
+      set('deploymentType', 'hallway');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isWifi7]);
+
+  return (
+    <div className="space-y-3">
+      <Section title="Property Information">
+        <Field label="Project / Property Name">
+          <ProjectNameField
+            value={inputs.propertyName}
+            onChange={(e) => set('propertyName', e.target.value)}
+            projects={projects}
+            currentProjectId={currentProjectId}
+            onSelectProject={onSelectProject}
+          />
+        </Field>
+        <Field label="Property Address">
+          <TextInput
+            value={inputs.propertyAddress}
+            onChange={(e) => set('propertyAddress', e.target.value)}
+            placeholder="123 Main St, City, ST"
+          />
+        </Field>
+        <Field label="Vertical">
+          <Segmented
+            value={inputs.propertyType}
+            onChange={(v) => set('propertyType', v)}
+            options={[
+              { value: 'hospitality', label: 'Hospitality' },
+              { value: 'senior_living', label: 'Senior Living' },
+              { value: 'multifamily', label: 'Multi-Family' },
+            ]}
+          />
+        </Field>
+      </Section>
+
+      <Section title="Network Design">
+        <Field label="Wi-Fi Generation">
+          <Segmented
+            value={inputs.wifiGeneration}
+            onChange={(v) => set('wifiGeneration', v)}
+            options={[
+              { value: 'wifi6', label: 'Wi-Fi 6' },
+              { value: 'wifi7', label: 'Wi-Fi 7' },
+            ]}
+          />
+        </Field>
+        <Field label="Gateway Model">
+          <Select value={inputs.gatewayModel} onChange={(e) => set('gatewayModel', e.target.value)}>
+            <option value="NSE3000">NSE3000</option>
+            <option value="NSE4000">NSE4000</option>
+          </Select>
+        </Field>
+        <Field
+          label="Deployment Type"
+          sub={isWifi7 ? 'In-room unavailable for Wi-Fi 7 (hallway enforced)' : undefined}
+        >
+          <Segmented
+            value={inputs.deploymentType}
+            onChange={(v) => set('deploymentType', v)}
+            options={[
+              { value: 'hallway', label: 'Hallway' },
+              { value: 'inroom', label: 'In-Room', disabled: isWifi7 },
+            ]}
+          />
+        </Field>
+        <Field label={term.unitLabel}>
+          <NumberInput value={inputs.numberOfRooms} onChange={(v) => set('numberOfRooms', v)} min={0} />
+        </Field>
+        <Field label={term.apRatioLabel} sub={`1 AP per N ${term.apRatioSub.replace('per ', '')}`}>
+          <Select
+            value={inputs.apToRoomRatio}
+            onChange={(e) => set('apToRoomRatio', Number(e.target.value))}
+          >
+            {[1, 2, 3, 4].map((n) => (
+              <option key={n} value={n}>
+                1 : {n}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field label="Number of IDFs">
+          <NumberInput value={inputs.numberOfIDFs} onChange={(v) => set('numberOfIDFs', v)} min={1} />
+        </Field>
+      </Section>
+
+      <Section title="Additional AP Locations">
+        <Field label={term.commonAreaLabel}>
+          <NumberInput value={inputs.meetingRooms} onChange={(v) => set('meetingRooms', v)} />
+        </Field>
+        <Field label="Public Area APs">
+          <NumberInput value={inputs.publicAreaAPs} onChange={(v) => set('publicAreaAPs', v)} />
+        </Field>
+        <Field label="Back-of-House APs">
+          <NumberInput value={inputs.bohAPs} onChange={(v) => set('bohAPs', v)} />
+        </Field>
+        <Field label="Outdoor APs">
+          <NumberInput value={inputs.outdoorAPs} onChange={(v) => set('outdoorAPs', v)} />
+        </Field>
+        <Field label={term.wiredLabel}>
+          <NumberInput
+            value={inputs.guestRoomWiredConnections}
+            onChange={(v) => set('guestRoomWiredConnections', v)}
+          />
+        </Field>
+        <Field label={term.businessLabel}>
+          <NumberInput
+            value={inputs.businessCenterWired}
+            onChange={(v) => set('businessCenterWired', v)}
+          />
+        </Field>
+      </Section>
+
+      <Section title="Options">
+        <Toggle
+          checked={inputs.idfRacksNeeded}
+          onChange={(v) => set('idfRacksNeeded', v)}
+          label="IDF Racks Needed"
+        />
+        <Toggle checked={inputs.spareAPs} onChange={(v) => set('spareAPs', v)} label="Include Spare APs (5%)" />
+        <Toggle
+          checked={inputs.spareSwitches}
+          onChange={(v) => set('spareSwitches', v)}
+          label="Include Spare Switch"
+        />
+        <Field label="Aggregate Switch Type">
+          <Select value={inputs.aggSwitchType} onChange={(e) => set('aggSwitchType', e.target.value)}>
+            <option value="fiber">Fiber (EX3024F)</option>
+            <option value="copper">Copper (EX2052P)</option>
+          </Select>
+        </Field>
+        <Toggle
+          checked={inputs.cat6Required}
+          onChange={(v) => set('cat6Required', v)}
+          label="Structured CAT6 Cabling"
+        />
+        {inputs.cat6Required && (
+          <Field label="CAT6 Drops">
+            <NumberInput value={inputs.cat6Drops} onChange={(v) => set('cat6Drops', v)} />
+          </Field>
+        )}
+        <Field label="Building-to-Building Connection">
+          <Select
+            value={inputs.b2bConnectionType}
+            onChange={(e) => set('b2bConnectionType', e.target.value)}
+          >
+            <option value="none">None</option>
+            <option value="fiber">Fiber</option>
+            <option value="copper">Copper</option>
+            <option value="wireless">Wireless</option>
+          </Select>
+        </Field>
+        {inputs.b2bConnectionType !== 'none' && (
+          <Field label="B2B Links">
+            <NumberInput
+              value={inputs.b2bConnectionQty}
+              onChange={(v) => set('b2bConnectionQty', v)}
+              min={1}
+            />
+          </Field>
+        )}
+        <Field
+          label="Misc Hardware %"
+          sub="0 = fixed $650 line; >0 = percent of hardware subtotal"
+        >
+          <NumberInput value={inputs.miscHwPercent} onChange={(v) => set('miscHwPercent', v)} />
+        </Field>
+      </Section>
+    </div>
+  );
+}

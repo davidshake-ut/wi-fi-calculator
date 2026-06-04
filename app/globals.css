@@ -1,0 +1,31 @@
+@import "tailwindcss";
+
+/* base44-inspired neutral theme, translated to Tailwind v4 tokens.
+   Light/neutral surface, near-black text, soft borders, blue accent. */
+:root {
+  --background: #f6f7f9;        /* soft neutral page */
+  --foreground: #0f172a;        /* slate-900 */
+  --radius: 0.75rem;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Slightly tighter, more refined headings to lift it above the default look. */
+h1, h2, h3 {
+  letter-spacing: -0.011em;
+}
