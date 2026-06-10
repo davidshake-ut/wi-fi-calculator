@@ -5,7 +5,15 @@ import { Card } from '@/components/ui/primitives';
 import BOMTable from '@/components/BOMTable';
 import { currency, percent, marginBg } from '@/lib/format';
 
-export default function CameraSystems({ cameraBom, showMargin, setShowMargin }) {
+export default function CameraSystems({
+  cameraBom,
+  showMargin,
+  setShowMargin,
+  priceOverrides,
+  setPriceOverrides,
+  editPrices,
+  setEditPrices,
+}) {
   const profit = cameraBom.grandTotalPrice - cameraBom.grandTotalCost;
   const retentionLabel = cameraBom.retention === 'week' ? '~1 week (2TB)' : '~1 month (8TB)';
 
@@ -79,7 +87,15 @@ export default function CameraSystems({ cameraBom, showMargin, setShowMargin }) 
         </Card>
       ) : (
         <>
-          <BOMTable bom={cameraBom} showMargin={showMargin} setShowMargin={setShowMargin} />
+          <BOMTable
+            bom={cameraBom}
+            showMargin={showMargin}
+            setShowMargin={setShowMargin}
+            priceOverrides={priceOverrides}
+            setPriceOverrides={setPriceOverrides}
+            editPrices={editPrices}
+            setEditPrices={setEditPrices}
+          />
 
           <Card className="overflow-hidden">
             <table className="w-full text-sm">

@@ -47,6 +47,7 @@ function Calculator() {
   const [serviceOverrides, setServiceOverrides] = useState({});
   const [activeTab, setActiveTab] = useState('hardware');
   const [showMargin, setShowMargin] = useState(false);
+  const [editPrices, setEditPrices] = useState(false);
   const [editServices, setEditServices] = useState(false);
   const [currentProjectId, setCurrentProjectId] = useState(null);
   const [savedSnapshot, setSavedSnapshot] = useState(null);
@@ -292,7 +293,15 @@ function Calculator() {
           {!onCameras && <SummaryCards bom={bom} term={term} />}
 
           {activeTab === 'hardware' && (
-            <BOMTable bom={bom} showMargin={showMargin} setShowMargin={setShowMargin} />
+            <BOMTable
+              bom={bom}
+              showMargin={showMargin}
+              setShowMargin={setShowMargin}
+              priceOverrides={priceOverrides}
+              setPriceOverrides={setPriceOverrides}
+              editPrices={editPrices}
+              setEditPrices={setEditPrices}
+            />
           )}
           {activeTab === 'services' && (
             <div className="space-y-4">
@@ -343,6 +352,10 @@ function Calculator() {
               cameraBom={cameraBom}
               showMargin={showMargin}
               setShowMargin={setShowMargin}
+              priceOverrides={priceOverrides}
+              setPriceOverrides={setPriceOverrides}
+              editPrices={editPrices}
+              setEditPrices={setEditPrices}
             />
           )}
           {activeTab === 'products' && (

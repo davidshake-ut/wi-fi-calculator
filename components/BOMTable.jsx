@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronRight, RotateCcw } from 'lucide-react';
 import { Card, Button, Badge } from '@/components/ui/primitives';
 import { CATEGORY_ORDER } from '@/lib/catalog';
 import { SEGMENT_ORDER, segmentOf } from '@/lib/segments';
@@ -15,12 +15,14 @@ const SORTS = [
   { id: 'name', label: 'Name: A → Z' },
 ];
 
+const EDIT_INPUT =
+  'h-7 w-24 rounded border border-slate-300 px-2 text-right text-xs tabular-nums text-slate-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20';
+
 function sortItems(items, sortBy) {
   const arr = [...items];
   if (sortBy === 'priceDesc') return arr.sort((a, b) => b.totalPrice - a.totalPrice);
   if (sortBy === 'priceAsc') return arr.sort((a, b) => a.totalPrice - b.totalPrice);
   if (sortBy === 'name') return arr.sort((a, b) => (a.description || '').localeCompare(b.description || ''));
-  // category (default): by CATEGORY_ORDER then description
   return arr.sort((a, b) => {
     const ca = CATEGORY_ORDER.indexOf(a.category);
     const cb = CATEGORY_ORDER.indexOf(b.category);
@@ -43,13 +45,25 @@ function groupBySegment(items) {
   return ordered;
 }
 
-export default function BOMTable({ bom, showMargin, setShowMargin }) {
+export default function BOMTable({
+  bom,
+  showMargin,
+  setShowMargin,
+  priceOverrides = {},
+  setPriceOverrides,
+  editPrices = false,
+  setEditPrices,
+}) {
   const [collapsed, setCollapsed] = useState(() => new Set());
   const [hidden, setHidden] = useState(() => new Set());
   const [sortBy, setSortBy] = useState('category');
 
   const groups = useMemo(() => groupBySegment(bom.items), [bom.items]);
   const segmentsPresent = useMemo(() => groups.map(([seg]) => seg), [groups]);
+
+  const editable = Boolean(setPriceOverrides);
+  // Editing cost requires the cost columns to be visible.
+  const showCost = showMargin || (editable && editPrices);
 
   const toggleCollapse = (seg) =>
     setCollapsed((prev) => {
@@ -65,9 +79,26 @@ export default function BOMTable({ bom, showMargin, setShowMargin }) {
       return next;
     });
 
+  const setOverride = (sku, field, value, line) =>
+    setPriceOverrides((prev) => ({
+      ...prev,
+      [sku]: {
+        cost: prev[sku]?.cost ?? line.unitCost,
+        price: prev[sku]?.price ?? line.unitPrice,
+        [field]: value,
+      },
+    }));
+
+  const resetOne = (sku) =>
+    setPriceOverrides((prev) => {
+      const next = { ...prev };
+      delete next[sku];
+      return next;
+    });
+
   const visibleGroups = groups.filter(([seg]) => !hidden.has(seg));
 
-  const colCount = showMargin ? 8 : 5;
+  const colCount = showCost ? 8 : 5;
   const th = 'px-4 py-2.5 font-medium';
   const thNum = `${th} text-right whitespace-nowrap`;
   const td = 'px-4 py-2 whitespace-nowrap';
@@ -99,7 +130,7 @@ export default function BOMTable({ bom, showMargin, setShowMargin }) {
           })}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <label className="flex items-center gap-1.5 text-xs text-slate-500">
             Sort
             <select
@@ -114,11 +145,47 @@ export default function BOMTable({ bom, showMargin, setShowMargin }) {
               ))}
             </select>
           </label>
-          <Button variant="outline" size="sm" onClick={() => setShowMargin((s) => !s)}>
-            {showMargin ? 'Hide Cost & Margin' : 'Show Cost & Margin'}
-          </Button>
+
+          {editable && (
+            <button
+              type="button"
+              role="switch"
+              aria-checked={editPrices}
+              onClick={() => setEditPrices?.((v) => !v)}
+              title="Edit cost & price for this project only (does not change the catalog)"
+              className="flex items-center gap-2 text-xs font-medium text-slate-600"
+            >
+              <span>Edit Prices</span>
+              <span
+                className={cn(
+                  'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors',
+                  editPrices ? 'bg-[var(--brand,#2563eb)]' : 'bg-slate-300'
+                )}
+              >
+                <span
+                  className={cn(
+                    'inline-block h-4 w-4 rounded-full bg-white shadow ring-1 ring-black/10 transition-transform',
+                    editPrices ? 'translate-x-4' : 'translate-x-0.5'
+                  )}
+                />
+              </span>
+            </button>
+          )}
+
+          {!editPrices && (
+            <Button variant="outline" size="sm" onClick={() => setShowMargin((s) => !s)}>
+              {showMargin ? 'Hide Cost & Margin' : 'Show Cost & Margin'}
+            </Button>
+          )}
         </div>
       </div>
+
+      {editPrices && (
+        <p className="px-1 text-xs text-slate-400">
+          Editing cost &amp; price for <strong>this project only</strong> — the product database is
+          unchanged. Slide off when done; values are kept and saved with the project.
+        </p>
+      )}
 
       <Card className="overflow-hidden">
         <div className="overflow-x-auto">
@@ -128,11 +195,11 @@ export default function BOMTable({ bom, showMargin, setShowMargin }) {
                 <th className={th}>SKU</th>
                 <th className={th}>Description</th>
                 <th className={thNum}>Qty</th>
-                {showMargin && <th className={thNum}>Unit Cost</th>}
+                {showCost && <th className={thNum}>Unit Cost</th>}
                 <th className={thNum}>Unit Price</th>
-                {showMargin && <th className={thNum}>Total Cost</th>}
+                {showCost && <th className={thNum}>Total Cost</th>}
                 <th className={thNum}>Total Price</th>
-                {showMargin && <th className={thNum}>Margin</th>}
+                {showCost && <th className={thNum}>Margin</th>}
               </tr>
             </thead>
 
@@ -173,45 +240,92 @@ export default function BOMTable({ bom, showMargin, setShowMargin }) {
                   </tr>
 
                   {open &&
-                    sorted.map((r, i) => (
-                      <tr
-                        key={`${r.sku}-${i}`}
-                        className="border-b border-slate-50 last:border-0 hover:bg-slate-50/60"
-                      >
-                        <td className={`${td} font-mono text-xs text-slate-500`}>{r.sku}</td>
-                        <td className="min-w-[14rem] px-4 py-2 text-slate-700">
-                          <span className="inline-flex items-center gap-2">
-                            <span>{r.description}</span>
-                            <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-400">
-                              {r.category}
-                            </span>
-                          </span>
-                          {r.note && (
-                            <span className="block text-xs italic text-slate-400">{r.note}</span>
+                    sorted.map((r, i) => {
+                      const overridden = Boolean(priceOverrides[r.sku]);
+                      return (
+                        <tr
+                          key={`${r.sku}-${i}`}
+                          className={cn(
+                            'border-b border-slate-50 last:border-0',
+                            overridden ? 'bg-orange-50/60' : 'hover:bg-slate-50/60'
                           )}
-                        </td>
-                        <td className={`${tdNum} text-slate-700`}>{r.qty}</td>
-                        {showMargin && (
-                          <td className={`${tdNum} text-slate-500`}>{currency(r.unitCost)}</td>
-                        )}
-                        <td className={`${tdNum} text-slate-700`}>{currency(r.unitPrice)}</td>
-                        {showMargin && (
-                          <td className={`${tdNum} text-slate-500`}>{currency(r.totalCost)}</td>
-                        )}
-                        <td className={`${tdNum} font-medium text-slate-700`}>
-                          {currency(r.totalPrice)}
-                        </td>
-                        {showMargin && (
-                          <td className={`${td} text-right`}>
-                            <span
-                              className={`rounded px-1.5 py-0.5 text-xs tabular-nums ${marginColor(r.margin)}`}
-                            >
-                              {percent(r.margin, 0)}
+                        >
+                          <td className={`${td} font-mono text-xs text-slate-500`}>{r.sku}</td>
+                          <td className="min-w-[14rem] px-4 py-2 text-slate-700">
+                            <span className="inline-flex items-center gap-2">
+                              <span>{r.description}</span>
+                              <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-400">
+                                {r.category}
+                              </span>
                             </span>
+                            {r.note && (
+                              <span className="block text-xs italic text-slate-400">{r.note}</span>
+                            )}
                           </td>
-                        )}
-                      </tr>
-                    ))}
+                          <td className={`${tdNum} text-slate-700`}>{r.qty}</td>
+
+                          {showCost && (
+                            <td className={`${tdNum} text-slate-500`}>
+                              {editPrices ? (
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  className={EDIT_INPUT}
+                                  value={r.unitCost}
+                                  onChange={(e) => setOverride(r.sku, 'cost', Number(e.target.value), r)}
+                                />
+                              ) : (
+                                currency(r.unitCost)
+                              )}
+                            </td>
+                          )}
+
+                          <td className={`${tdNum} text-slate-700`}>
+                            {editPrices ? (
+                              <div className="flex items-center justify-end gap-1">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  className={EDIT_INPUT}
+                                  value={r.unitPrice}
+                                  onChange={(e) => setOverride(r.sku, 'price', Number(e.target.value), r)}
+                                />
+                                {overridden && (
+                                  <button
+                                    type="button"
+                                    title="Reset to catalog cost/price"
+                                    onClick={() => resetOne(r.sku)}
+                                    className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                                  >
+                                    <RotateCcw size={13} />
+                                  </button>
+                                )}
+                              </div>
+                            ) : (
+                              currency(r.unitPrice)
+                            )}
+                          </td>
+
+                          {showCost && (
+                            <td className={`${tdNum} text-slate-500`}>{currency(r.totalCost)}</td>
+                          )}
+                          <td className={`${tdNum} font-medium text-slate-700`}>
+                            {currency(r.totalPrice)}
+                          </td>
+                          {showCost && (
+                            <td className={`${td} text-right`}>
+                              <span
+                                className={`rounded px-1.5 py-0.5 text-xs tabular-nums ${marginColor(r.margin)}`}
+                              >
+                                {percent(r.margin, 0)}
+                              </span>
+                            </td>
+                          )}
+                        </tr>
+                      );
+                    })}
                 </tbody>
               );
             })}
