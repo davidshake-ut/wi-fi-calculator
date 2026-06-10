@@ -129,25 +129,28 @@ function Calculator() {
     }
   };
 
-  const handleExportCSV = () =>
-    onCameras
-      ? exportCSV(inputs, cameraBom, { fileSuffix: 'Cameras' })
-      : exportCSV(inputs, bom);
+  // Exports always include both systems, each in its own section (camera
+  // section only when cameras are configured).
+  const exportSections = () => {
+    const list = [{ title: 'Managed Wi-Fi', bom, kpis: wifiKpis(bom, term) }];
+    if (cameraBom.totalCameras > 0) {
+      list.push({ title: 'Camera Systems', bom: cameraBom, kpis: cameraKpis(cameraBom) });
+    }
+    return list;
+  };
+
+  const hasCameras = cameraBom.totalCameras > 0;
+
+  const handleExportCSV = () => exportCSV(inputs, exportSections(), { fileSuffix: 'Quote' });
 
   const handleExportPDF = () =>
-    onCameras
-      ? exportPDF(inputs, cameraBom, {
-          title: 'Camera Systems — Budgetary Quote',
-          kpis: cameraKpis(cameraBom),
-          footerLabel: 'Camera Systems',
-          fileSuffix: 'Cameras',
-        })
-      : exportPDF(inputs, bom, {
-          title: 'Managed Wi-Fi — Budgetary Quote',
-          kpis: wifiKpis(bom, term),
-          footerLabel: 'Managed Wi-Fi',
-          fileSuffix: 'BOM',
-        });
+    exportPDF(inputs, exportSections(), {
+      title: hasCameras
+        ? 'Wi-Fi & Camera Systems — Budgetary Quote'
+        : 'Managed Wi-Fi — Budgetary Quote',
+      footerLabel: hasCameras ? 'Managed Systems' : 'Managed Wi-Fi',
+      fileSuffix: 'Quote',
+    });
 
   const saveCatalog = async (form) => {
     if (modal.product) await editProduct(form);
