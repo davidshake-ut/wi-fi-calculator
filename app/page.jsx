@@ -2,13 +2,14 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { FileDown, Sheet, Wifi, Save, Shield, LogOut, Settings } from 'lucide-react';
+import { FileDown, FileText, Sheet, Wifi, Save, Shield, LogOut, Settings } from 'lucide-react';
 import AuthGuard from '@/components/AuthGuard';
 import { useSession } from '@/components/SessionProvider';
 import InputPanel from '@/components/InputPanel';
 import CameraInputPanel from '@/components/CameraInputPanel';
 import BrandingModal from '@/components/BrandingModal';
 import { useBranding } from '@/hooks/useBranding';
+import { readableTextHex } from '@/lib/colors';
 import SummaryCards from '@/components/SummaryCards';
 import BOMTable from '@/components/BOMTable';
 import ServicesTable from '@/components/ServicesTable';
@@ -24,6 +25,7 @@ import { useProjects } from '@/hooks/useProjects';
 import { DEFAULT_INPUTS, DEFAULT_CAMERA_INPUTS } from '@/lib/defaults';
 import { getTerminology } from '@/lib/terminology';
 import { exportPDF, wifiKpis, cameraKpis } from '@/lib/exportPDF';
+import { exportProposalPDF } from '@/lib/exportProposal';
 import { exportCSV } from '@/lib/exportCSV';
 import { cn } from '@/lib/utils';
 
@@ -136,9 +138,14 @@ function Calculator() {
   // Exports always include both systems, each in its own section (camera
   // section only when cameras are configured).
   const exportSections = () => {
-    const list = [{ title: 'Managed Wi-Fi', bom, kpis: wifiKpis(bom, term) }];
+    const list = [{ title: 'Managed Wi-Fi', label: 'Wi-Fi', bom, kpis: wifiKpis(bom, term) }];
     if (cameraBom.totalCameras > 0) {
-      list.push({ title: 'Camera Systems', bom: cameraBom, kpis: cameraKpis(cameraBom) });
+      list.push({
+        title: 'Camera Systems',
+        label: 'Camera',
+        bom: cameraBom,
+        kpis: cameraKpis(cameraBom),
+      });
     }
     return list;
   };
@@ -158,6 +165,9 @@ function Calculator() {
       branding,
     });
 
+  const handleExportProposal = () =>
+    exportProposalPDF({ inputs, cameraInputs, term, sections: exportSections(), branding });
+
   const saveCatalog = async (form) => {
     if (modal.product) await editProduct(form);
     else await addProduct(form);
@@ -172,8 +182,13 @@ function Calculator() {
     }
   };
 
+  const brandText = readableTextHex(branding.primaryColor);
+
   return (
-    <div className="flex min-h-screen flex-col" style={{ '--brand': branding.primaryColor }}>
+    <div
+      className="flex min-h-screen flex-col"
+      style={{ '--brand': branding.primaryColor, '--brand-text': brandText }}
+    >
       <header className="sticky top-0 z-20 border-b border-slate-200/70 bg-white/80 backdrop-blur-md">
         <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <div className="flex items-center gap-2.5">
@@ -186,8 +201,8 @@ function Calculator() {
               />
             ) : (
               <span
-                className="flex h-9 w-9 items-center justify-center rounded-xl text-white shadow-sm"
-                style={{ background: branding.primaryColor }}
+                className="flex h-9 w-9 items-center justify-center rounded-xl shadow-sm"
+                style={{ background: branding.primaryColor, color: brandText }}
               >
                 <Wifi size={18} />
               </span>
@@ -211,6 +226,9 @@ function Calculator() {
             </Button>
             <Button variant="outline" size="sm" onClick={handleExportPDF}>
               <FileDown size={14} /> PDF
+            </Button>
+            <Button size="sm" onClick={handleExportProposal} title="Customer-facing proposal (sell price only)">
+              <FileText size={14} /> Proposal
             </Button>
             <button
               onClick={() => setBrandingOpen(true)}
@@ -261,7 +279,7 @@ function Calculator() {
                 className={cn(
                   'whitespace-nowrap rounded-lg px-3.5 py-1.5 text-sm font-medium transition-all',
                   activeTab === t.id
-                    ? 'bg-[var(--brand,#2563eb)] text-white shadow-sm'
+                    ? 'bg-[var(--brand,#2563eb)] text-[var(--brand-text,#fff)] shadow-sm'
                     : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
                 )}
               >
