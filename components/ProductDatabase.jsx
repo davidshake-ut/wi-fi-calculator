@@ -7,7 +7,6 @@ import {
   ChevronsUpDown,
   Download,
   Pencil,
-  RotateCcw,
   Search,
   Trash2,
   Upload,
@@ -20,11 +19,9 @@ import { currency } from '@/lib/format';
 
 export default function ProductDatabase({
   allProducts,
-  priceOverrides,
-  setPriceOverrides,
-  onAdd, // Phase D
-  onEdit, // Phase D
-  onDelete, // Phase D
+  onAdd,
+  onEdit,
+  onDelete,
   onImport,
   canManageCatalog = false,
 }) {
@@ -122,26 +119,6 @@ export default function ProductDatabase({
     </th>
   );
 
-  const effective = (p, field) => priceOverrides[p.sku]?.[field] ?? p[field];
-
-  const setOverride = (p, field, value) => {
-    setPriceOverrides((prev) => ({
-      ...prev,
-      [p.sku]: {
-        cost: prev[p.sku]?.cost ?? p.cost,
-        price: prev[p.sku]?.price ?? p.price,
-        [field]: value,
-      },
-    }));
-  };
-
-  const resetOne = (sku) =>
-    setPriceOverrides((prev) => {
-      const next = { ...prev };
-      delete next[sku];
-      return next;
-    });
-
   return (
     <Card className="overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-2.5">
@@ -169,14 +146,6 @@ export default function ProductDatabase({
           </select>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={Object.keys(priceOverrides).length === 0}
-            onClick={() => setPriceOverrides({})}
-          >
-            Reset All Prices
-          </Button>
           <Button variant="outline" size="sm" onClick={() => exportCatalogCSV(allProducts)}>
             <Download size={14} /> Export CSV
           </Button>
@@ -225,86 +194,57 @@ export default function ProductDatabase({
                 </td>
               </tr>
             )}
-            {filtered.map((p) => {
-              const overridden = Boolean(priceOverrides[p.sku]);
-              return (
-                <tr
-                  key={p.sku}
-                  className={`border-b border-slate-50 last:border-0 ${overridden ? 'bg-orange-50/60' : ''}`}
-                >
-                  <td className="px-4 py-2 font-mono text-xs text-slate-500">
-                    {p.sku}
-                    {p.isCustom && (
-                      <Badge className="ml-1 border-purple-200 bg-purple-50 text-purple-600">custom</Badge>
-                    )}
-                  </td>
-                  <td className="px-4 py-2 text-slate-700">{p.desc}</td>
-                  <td className="px-4 py-2">
-                    <Badge className="border-slate-200 bg-slate-50 text-slate-500">{p.category}</Badge>
-                  </td>
-                  <td className="px-4 py-2 text-right">
-                    <input
-                      type="number"
-                      className="h-7 w-24 rounded border border-slate-300 px-2 text-right text-xs tabular-nums text-slate-700"
-                      value={effective(p, 'cost')}
-                      onChange={(e) => setOverride(p, 'cost', Number(e.target.value))}
-                    />
-                  </td>
-                  <td className="px-4 py-2 text-right">
-                    <input
-                      type="number"
-                      className="h-7 w-24 rounded border border-slate-300 px-2 text-right text-xs tabular-nums text-slate-700"
-                      value={effective(p, 'price')}
-                      onChange={(e) => setOverride(p, 'price', Number(e.target.value))}
-                    />
-                  </td>
-                  <td className="px-4 py-2">
-                    <div className="flex items-center justify-end gap-1">
-                      {overridden && (
+            {filtered.map((p) => (
+              <tr key={p.sku} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/60">
+                <td className="px-4 py-2 font-mono text-xs text-slate-500">
+                  {p.sku}
+                  {p.isCustom && (
+                    <Badge className="ml-1 border-purple-200 bg-purple-50 text-purple-600">custom</Badge>
+                  )}
+                </td>
+                <td className="px-4 py-2 text-slate-700">{p.desc}</td>
+                <td className="px-4 py-2">
+                  <Badge className="border-slate-200 bg-slate-50 text-slate-500">{p.category}</Badge>
+                </td>
+                <td className="px-4 py-2 text-right tabular-nums text-slate-700">{currency(p.cost)}</td>
+                <td className="px-4 py-2 text-right tabular-nums text-slate-700">{currency(p.price)}</td>
+                <td className="px-4 py-2">
+                  <div className="flex items-center justify-end gap-1">
+                    {canManageCatalog && (
+                      <>
                         <button
-                          title="Reset price override"
-                          onClick={() => resetOne(p.sku)}
-                          className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                          title="Edit product (changes the catalog)"
+                          onClick={() => onEdit?.(p)}
+                          className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-blue-50 hover:text-blue-600"
                         >
-                          <RotateCcw size={15} />
+                          <Pencil size={15} />
                         </button>
-                      )}
-                      {canManageCatalog && (
-                        <>
-                          <button
-                            title="Edit product"
-                            onClick={() => onEdit?.(p)}
-                            className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-blue-50 hover:text-blue-600"
-                          >
-                            <Pencil size={15} />
-                          </button>
-                          <button
-                            title={
-                              CORE_SKUS.has(p.sku)
-                                ? 'Core product — cannot be deleted'
-                                : 'Delete product'
-                            }
-                            onClick={() => onDelete?.(p)}
-                            disabled={CORE_SKUS.has(p.sku)}
-                            className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-slate-400"
-                          >
-                            <Trash2 size={15} />
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
+                        <button
+                          title={
+                            CORE_SKUS.has(p.sku)
+                              ? 'Core product — cannot be deleted'
+                              : 'Delete product'
+                          }
+                          onClick={() => onDelete?.(p)}
+                          disabled={CORE_SKUS.has(p.sku)}
+                          className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-slate-400"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
       <p className="border-t border-slate-100 px-4 py-2 text-xs text-slate-400">
-        Cost/price edits here are <strong>per-project</strong> overrides saved with the project.
-        Catalog Add/Edit/Delete writes to the product database.{' '}
-        <strong>Import CSV</strong> adds/updates products using the{' '}
-        <strong>Export CSV</strong> template columns: SKU, Description, Category, Cost, Price.
+        These are the <strong>catalog</strong> cost/price. Edit a product (pencil), Add, Delete, or
+        Import to change the product database for all projects. To adjust pricing for{' '}
+        <strong>one project only</strong>, use <strong>Edit Prices</strong> on the Managed Wi-Fi or
+        Camera Systems BOM — those edits don&apos;t change the catalog.
       </p>
     </Card>
   );

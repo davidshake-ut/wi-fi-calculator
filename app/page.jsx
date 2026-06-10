@@ -361,8 +361,6 @@ function Calculator() {
           {activeTab === 'products' && (
             <ProductDatabase
               allProducts={allProducts}
-              priceOverrides={priceOverrides}
-              setPriceOverrides={setPriceOverrides}
               canManageCatalog={canManageCatalog}
               onAdd={() => setModal({ open: true, product: null })}
               onEdit={(p) => setModal({ open: true, product: p })}
