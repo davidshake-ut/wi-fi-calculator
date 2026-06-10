@@ -177,8 +177,8 @@ function LoginScreen() {
   );
 }
 
-export default function AuthGuard({ children, requireSuperAdmin = false }) {
-  const { configured, loading, session, error, isSuperAdmin, signOut } = useSession();
+export default function AuthGuard({ children, requireSuperAdmin = false, requireAdmin = false }) {
+  const { configured, loading, session, error, isSuperAdmin, isAdmin, signOut } = useSession();
 
   // Local mode — no backend configured. Calculator is fully usable.
   if (!configured) return children;
@@ -215,6 +215,15 @@ export default function AuthGuard({ children, requireSuperAdmin = false }) {
       <Centered>
         <h2 className="mb-2 text-base font-semibold text-slate-800">Access Denied</h2>
         <p className="text-sm text-slate-600">This page is restricted to super administrators.</p>
+      </Centered>
+    );
+  }
+
+  if (requireAdmin && !isAdmin) {
+    return (
+      <Centered>
+        <h2 className="mb-2 text-base font-semibold text-slate-800">Access Denied</h2>
+        <p className="text-sm text-slate-600">This page is restricted to team administrators.</p>
       </Centered>
     );
   }

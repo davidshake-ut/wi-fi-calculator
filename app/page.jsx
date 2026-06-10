@@ -39,7 +39,8 @@ const TABS = [
 ];
 
 function Calculator() {
-  const { configured, session, company, user, isSuperAdmin, role, refresh, signOut } = useSession();
+  const { configured, session, company, user, isSuperAdmin, isAdmin, role, refresh, signOut } =
+    useSession();
 
   const [inputs, setInputs] = useState(DEFAULT_INPUTS);
   const [cameraInputs, setCameraInputs] = useState(DEFAULT_CAMERA_INPUTS);
@@ -275,12 +276,12 @@ function Calculator() {
                 <Settings size={15} />
               </button>
             )}
-            {isSuperAdmin && (
+            {isAdmin && (
               <Link
                 href="/admin"
                 className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 shadow-sm hover:bg-slate-50"
               >
-                <Shield size={14} /> Admin
+                <Shield size={14} /> {isSuperAdmin ? 'Teams' : 'Team'}
               </Link>
             )}
             {configured && session && (
