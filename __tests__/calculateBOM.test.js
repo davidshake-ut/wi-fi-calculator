@@ -189,3 +189,29 @@ describe('Robustness', () => {
     expect(hasItem(bom, 'NSE3000')).toBe(false);
   });
 });
+
+describe('custom line items', () => {
+  it('appends custom lines (segment-tagged) and rolls them into totals', () => {
+    const base = calculateBOM(DEFAULT_INPUTS, {}, {}, BASE_PRODUCTS, []);
+    const withCustom = calculateBOM(DEFAULT_INPUTS, {}, {}, BASE_PRODUCTS, [
+      {
+        id: 'x1',
+        system: 'wifi',
+        segment: 'Accessories',
+        sku: 'CUST-1',
+        description: 'On-site rack build',
+        qty: 2,
+        cost: 100,
+        price: 250,
+      },
+    ]);
+    const line = withCustom.items.find((i) => i.sku === 'CUST-1');
+    expect(line).toBeTruthy();
+    expect(line.isCustomLine).toBe(true);
+    expect(line.segment).toBe('Accessories');
+    expect(line.totalPrice).toBe(500);
+    expect(line.totalCost).toBe(200);
+    expect(withCustom.totalHardwarePrice).toBeCloseTo(base.totalHardwarePrice + 500, 2);
+    expect(withCustom.grandTotalPrice).toBeGreaterThan(base.grandTotalPrice);
+  });
+});

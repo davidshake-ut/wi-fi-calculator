@@ -100,11 +100,12 @@ export function useProjects(session, company, user) {
       cameraInputs: { ...DEFAULT_CAMERA_INPUTS, ...(project.camera_inputs || {}) },
       priceOverrides: project.price_overrides || {},
       serviceOverrides: project.service_overrides || {},
+      customLineItems: project.custom_line_items || [],
     };
   }, []);
 
   const saveProject = useCallback(
-    async ({ id, projectName, inputs, cameraInputs, priceOverrides, serviceOverrides }) => {
+    async ({ id, projectName, inputs, cameraInputs, priceOverrides, serviceOverrides, customLineItems }) => {
       if (!supabase) {
         const now = new Date().toISOString();
         const list = readLocalArray();
@@ -119,6 +120,7 @@ export function useProjects(session, company, user) {
             camera_inputs: cameraInputs,
             price_overrides: priceOverrides,
             service_overrides: serviceOverrides,
+            custom_line_items: customLineItems,
             updated_at: now,
           };
           if (idx >= 0) list[idx] = saved;
@@ -131,6 +133,7 @@ export function useProjects(session, company, user) {
             camera_inputs: cameraInputs,
             price_overrides: priceOverrides,
             service_overrides: serviceOverrides,
+            custom_line_items: customLineItems,
             created_at: now,
             updated_at: now,
           };
@@ -146,6 +149,7 @@ export function useProjects(session, company, user) {
         camera_inputs: cameraInputs,
         price_overrides: priceOverrides,
         service_overrides: serviceOverrides,
+        custom_line_items: customLineItems,
         company_id: company?.id ?? null,
         updated_at: new Date().toISOString(),
       };

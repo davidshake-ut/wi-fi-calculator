@@ -45,6 +45,7 @@ function Calculator() {
   const [cameraInputs, setCameraInputs] = useState(DEFAULT_CAMERA_INPUTS);
   const [priceOverrides, setPriceOverrides] = useState({});
   const [serviceOverrides, setServiceOverrides] = useState({});
+  const [customLineItems, setCustomLineItems] = useState([]);
   const [activeTab, setActiveTab] = useState('hardware');
   const [showMargin, setShowMargin] = useState(false);
   const [editPrices, setEditPrices] = useState(false);
@@ -64,13 +65,41 @@ function Calculator() {
   const canManageCatalog = !configured || role === 'company_admin' || isSuperAdmin;
 
   const bom = useMemo(
-    () => calculateBOM(inputs, priceOverrides, serviceOverrides, allProducts),
-    [inputs, priceOverrides, serviceOverrides, allProducts]
+    () =>
+      calculateBOM(
+        inputs,
+        priceOverrides,
+        serviceOverrides,
+        allProducts,
+        customLineItems.filter((c) => c.system === 'wifi')
+      ),
+    [inputs, priceOverrides, serviceOverrides, allProducts, customLineItems]
   );
   const cameraBom = useMemo(
-    () => calculateCameraBOM(cameraInputs, priceOverrides, serviceOverrides, allProducts),
-    [cameraInputs, priceOverrides, serviceOverrides, allProducts]
+    () =>
+      calculateCameraBOM(
+        cameraInputs,
+        priceOverrides,
+        serviceOverrides,
+        allProducts,
+        customLineItems.filter((c) => c.system === 'camera')
+      ),
+    [cameraInputs, priceOverrides, serviceOverrides, allProducts, customLineItems]
   );
+
+  const newCustomId = () =>
+    typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `c-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+  const addCustomLine = (system, segment) =>
+    setCustomLineItems((prev) => [
+      ...prev,
+      { id: newCustomId(), system, segment, sku: '', description: '', qty: 1, cost: 0, price: 0 },
+    ]);
+  const updateCustomLine = (id, field, value) =>
+    setCustomLineItems((prev) => prev.map((c) => (c.id === id ? { ...c, [field]: value } : c)));
+  const removeCustomLine = (id) =>
+    setCustomLineItems((prev) => prev.filter((c) => c.id !== id));
   const term = getTerminology(inputs.propertyType);
 
   const onCameras = activeTab === 'cameras';
@@ -80,6 +109,7 @@ function Calculator() {
       return (
         Object.keys(priceOverrides).length > 0 ||
         Object.keys(serviceOverrides).length > 0 ||
+        customLineItems.length > 0 ||
         inputs.propertyName !== '' ||
         JSON.stringify(cameraInputs) !== JSON.stringify(DEFAULT_CAMERA_INPUTS)
       );
@@ -88,9 +118,10 @@ function Calculator() {
       JSON.stringify(inputs) !== JSON.stringify(savedSnapshot.inputs) ||
       JSON.stringify(cameraInputs) !== JSON.stringify(savedSnapshot.cameraInputs) ||
       JSON.stringify(priceOverrides) !== JSON.stringify(savedSnapshot.priceOverrides) ||
-      JSON.stringify(serviceOverrides) !== JSON.stringify(savedSnapshot.serviceOverrides)
+      JSON.stringify(serviceOverrides) !== JSON.stringify(savedSnapshot.serviceOverrides) ||
+      JSON.stringify(customLineItems) !== JSON.stringify(savedSnapshot.customLineItems)
     );
-  }, [inputs, cameraInputs, priceOverrides, serviceOverrides, savedSnapshot]);
+  }, [inputs, cameraInputs, priceOverrides, serviceOverrides, customLineItems, savedSnapshot]);
 
   const selectProject = (id) => {
     if (!id) {
@@ -98,6 +129,7 @@ function Calculator() {
       setCameraInputs(DEFAULT_CAMERA_INPUTS);
       setPriceOverrides({});
       setServiceOverrides({});
+      setCustomLineItems([]);
       setCurrentProjectId(null);
       setSavedSnapshot(null);
       return;
@@ -109,6 +141,7 @@ function Calculator() {
     setCameraInputs(loaded.cameraInputs);
     setPriceOverrides(loaded.priceOverrides);
     setServiceOverrides(loaded.serviceOverrides);
+    setCustomLineItems(loaded.customLineItems);
     setCurrentProjectId(project.id);
     setSavedSnapshot(loaded);
   };
@@ -127,9 +160,10 @@ function Calculator() {
         cameraInputs,
         priceOverrides,
         serviceOverrides,
+        customLineItems,
       });
       setCurrentProjectId(saved.id);
-      setSavedSnapshot({ inputs, cameraInputs, priceOverrides, serviceOverrides });
+      setSavedSnapshot({ inputs, cameraInputs, priceOverrides, serviceOverrides, customLineItems });
     } catch (e) {
       alert(`Save failed: ${e.message}`);
     } finally {
@@ -301,6 +335,9 @@ function Calculator() {
               setPriceOverrides={setPriceOverrides}
               editPrices={editPrices}
               setEditPrices={setEditPrices}
+              onAddCustom={(seg) => addCustomLine('wifi', seg)}
+              onUpdateCustom={updateCustomLine}
+              onRemoveCustom={removeCustomLine}
             />
           )}
           {activeTab === 'services' && (
@@ -356,6 +393,9 @@ function Calculator() {
               setPriceOverrides={setPriceOverrides}
               editPrices={editPrices}
               setEditPrices={setEditPrices}
+              onAddCustom={(seg) => addCustomLine('camera', seg)}
+              onUpdateCustom={updateCustomLine}
+              onRemoveCustom={removeCustomLine}
             />
           )}
           {activeTab === 'products' && (

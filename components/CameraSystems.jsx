@@ -13,6 +13,9 @@ export default function CameraSystems({
   setPriceOverrides,
   editPrices,
   setEditPrices,
+  onAddCustom,
+  onUpdateCustom,
+  onRemoveCustom,
 }) {
   const profit = cameraBom.grandTotalPrice - cameraBom.grandTotalCost;
   const retentionLabel = cameraBom.retention === 'week' ? '~1 week (2TB)' : '~1 month (8TB)';
@@ -74,7 +77,7 @@ export default function CameraSystems({
         })}
       </div>
 
-      {cameraBom.totalCameras === 0 ? (
+      {cameraBom.items.length === 0 ? (
         <Card className="flex flex-col items-center justify-center gap-2 p-12 text-center">
           <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
             <Video size={22} />
@@ -95,6 +98,9 @@ export default function CameraSystems({
             setPriceOverrides={setPriceOverrides}
             editPrices={editPrices}
             setEditPrices={setEditPrices}
+            onAddCustom={onAddCustom}
+            onUpdateCustom={onUpdateCustom}
+            onRemoveCustom={onRemoveCustom}
           />
 
           <Card className="overflow-hidden">

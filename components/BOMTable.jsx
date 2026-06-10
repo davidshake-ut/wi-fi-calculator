@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, RotateCcw } from 'lucide-react';
+import { ChevronDown, ChevronRight, Plus, RotateCcw, Trash2 } from 'lucide-react';
 import { Card, Button, Badge } from '@/components/ui/primitives';
 import { CATEGORY_ORDER } from '@/lib/catalog';
 import { SEGMENT_ORDER, segmentOf } from '@/lib/segments';
@@ -35,7 +35,7 @@ function sortItems(items, sortBy) {
 function groupBySegment(items) {
   const map = new Map();
   for (const item of items) {
-    const seg = segmentOf(item.category);
+    const seg = item.segment || segmentOf(item.category);
     if (!map.has(seg)) map.set(seg, []);
     map.get(seg).push(item);
   }
@@ -45,6 +45,9 @@ function groupBySegment(items) {
   return ordered;
 }
 
+const CUSTOM_INPUT =
+  'h-7 rounded border border-slate-300 px-2 text-xs text-slate-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20';
+
 export default function BOMTable({
   bom,
   showMargin,
@@ -53,6 +56,9 @@ export default function BOMTable({
   setPriceOverrides,
   editPrices = false,
   setEditPrices,
+  onAddCustom,
+  onUpdateCustom,
+  onRemoveCustom,
 }) {
   const [collapsed, setCollapsed] = useState(() => new Set());
   const [hidden, setHidden] = useState(() => new Set());
@@ -216,7 +222,8 @@ export default function BOMTable({
             {visibleGroups.map(([seg, rows]) => {
               const subtotal = rows.reduce((s, r) => s + r.totalPrice, 0);
               const open = !collapsed.has(seg);
-              const sorted = sortItems(rows, sortBy);
+              const calcRows = sortItems(rows.filter((r) => !r.isCustomLine), sortBy);
+              const customRows = rows.filter((r) => r.isCustomLine);
               return (
                 <tbody key={seg}>
                   <tr
@@ -231,6 +238,24 @@ export default function BOMTable({
                           <Badge className="border-slate-200 bg-white text-slate-500">
                             {rows.length}
                           </Badge>
+                          {onAddCustom && (
+                            <button
+                              type="button"
+                              title="Add a custom line item to this section"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setCollapsed((prev) => {
+                                  const n = new Set(prev);
+                                  n.delete(seg);
+                                  return n;
+                                });
+                                onAddCustom(seg);
+                              }}
+                              className="flex h-5 w-5 items-center justify-center rounded text-slate-400 transition-colors hover:bg-white hover:text-blue-600"
+                            >
+                              <Plus size={15} />
+                            </button>
+                          )}
                         </span>
                         <span className="text-sm font-semibold tabular-nums text-slate-700">
                           {currency(subtotal)}
@@ -239,10 +264,11 @@ export default function BOMTable({
                     </td>
                   </tr>
 
-                  {open &&
-                    sorted.map((r, i) => {
-                      const overridden = Boolean(priceOverrides[r.sku]);
-                      return (
+                  {open && (
+                    <>
+                      {calcRows.map((r, i) => {
+                        const overridden = Boolean(priceOverrides[r.sku]);
+                        return (
                         <tr
                           key={`${r.sku}-${i}`}
                           className={cn(
@@ -324,8 +350,77 @@ export default function BOMTable({
                             </td>
                           )}
                         </tr>
-                      );
-                    })}
+                        );
+                      })}
+
+                      {customRows.map((r) => (
+                        <tr key={r.id} className="border-b border-slate-50 bg-blue-50/40">
+                          <td colSpan={colCount} className="px-4 py-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="shrink-0 rounded bg-[var(--brand,#2563eb)] px-1.5 py-0.5 text-[10px] font-semibold uppercase text-[var(--brand-text,#fff)]">
+                                Custom
+                              </span>
+                              <input
+                                value={r.sku}
+                                onChange={(e) => onUpdateCustom(r.id, 'sku', e.target.value)}
+                                placeholder="SKU"
+                                className={`${CUSTOM_INPUT} w-28 font-mono`}
+                              />
+                              <input
+                                value={r.description}
+                                onChange={(e) => onUpdateCustom(r.id, 'description', e.target.value)}
+                                placeholder="Description"
+                                className={`${CUSTOM_INPUT} min-w-[10rem] flex-1`}
+                              />
+                              <label className="flex items-center gap-1 text-xs text-slate-500">
+                                Qty
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={r.qty}
+                                  onChange={(e) => onUpdateCustom(r.id, 'qty', Number(e.target.value))}
+                                  className={`${CUSTOM_INPUT} w-16 text-right tabular-nums`}
+                                />
+                              </label>
+                              <label className="flex items-center gap-1 text-xs text-slate-500">
+                                Cost
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  value={r.unitCost}
+                                  onChange={(e) => onUpdateCustom(r.id, 'cost', Number(e.target.value))}
+                                  className={`${CUSTOM_INPUT} w-24 text-right tabular-nums`}
+                                />
+                              </label>
+                              <label className="flex items-center gap-1 text-xs text-slate-500">
+                                Price
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  value={r.unitPrice}
+                                  onChange={(e) => onUpdateCustom(r.id, 'price', Number(e.target.value))}
+                                  className={`${CUSTOM_INPUT} w-24 text-right tabular-nums`}
+                                />
+                              </label>
+                              <span className="ml-auto text-sm font-medium tabular-nums text-slate-700">
+                                {currency(r.totalPrice)}
+                              </span>
+                              <button
+                                type="button"
+                                title="Remove line item"
+                                onClick={() => onRemoveCustom(r.id)}
+                                className="rounded p-1 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </>
+                  )}
                 </tbody>
               );
             })}
