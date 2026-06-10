@@ -1,43 +1,71 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { Card, Button, Badge } from '@/components/ui/primitives';
 import { CATEGORY_ORDER } from '@/lib/catalog';
+import { SEGMENT_ORDER, segmentOf } from '@/lib/segments';
 import { currency, percent, marginColor } from '@/lib/format';
+import { cn } from '@/lib/utils';
 
-function groupByCategory(items) {
-  const groups = new Map();
+const SORTS = [
+  { id: 'category', label: 'Category' },
+  { id: 'priceDesc', label: 'Price: High → Low' },
+  { id: 'priceAsc', label: 'Price: Low → High' },
+  { id: 'name', label: 'Name: A → Z' },
+];
+
+function sortItems(items, sortBy) {
+  const arr = [...items];
+  if (sortBy === 'priceDesc') return arr.sort((a, b) => b.totalPrice - a.totalPrice);
+  if (sortBy === 'priceAsc') return arr.sort((a, b) => a.totalPrice - b.totalPrice);
+  if (sortBy === 'name') return arr.sort((a, b) => (a.description || '').localeCompare(b.description || ''));
+  // category (default): by CATEGORY_ORDER then description
+  return arr.sort((a, b) => {
+    const ca = CATEGORY_ORDER.indexOf(a.category);
+    const cb = CATEGORY_ORDER.indexOf(b.category);
+    const c = (ca === -1 ? 99 : ca) - (cb === -1 ? 99 : cb);
+    if (c !== 0) return c;
+    return (a.description || '').localeCompare(b.description || '');
+  });
+}
+
+function groupBySegment(items) {
+  const map = new Map();
   for (const item of items) {
-    if (!groups.has(item.category)) groups.set(item.category, []);
-    groups.get(item.category).push(item);
+    const seg = segmentOf(item.category);
+    if (!map.has(seg)) map.set(seg, []);
+    map.get(seg).push(item);
   }
   const ordered = [];
-  for (const cat of CATEGORY_ORDER) {
-    if (groups.has(cat)) ordered.push([cat, groups.get(cat)]);
-  }
-  // Any category not in CATEGORY_ORDER, appended at the end.
-  for (const [cat, rows] of groups) {
-    if (!CATEGORY_ORDER.includes(cat)) ordered.push([cat, rows]);
-  }
+  for (const seg of SEGMENT_ORDER) if (map.has(seg)) ordered.push([seg, map.get(seg)]);
+  for (const [seg, rows] of map) if (!SEGMENT_ORDER.includes(seg)) ordered.push([seg, rows]);
   return ordered;
 }
 
-// One single table for the whole BOM (rather than a table per category) so all
-// columns share one auto-layout: numeric/SKU cells never wrap (whitespace-nowrap)
-// and the flexible Description column absorbs the slack — columns line up across
-// every category and nothing rolls onto a second line while space exists.
 export default function BOMTable({ bom, showMargin, setShowMargin }) {
-  const groups = groupByCategory(bom.items);
   const [collapsed, setCollapsed] = useState(() => new Set());
+  const [hidden, setHidden] = useState(() => new Set());
+  const [sortBy, setSortBy] = useState('category');
 
-  const toggle = (cat) =>
+  const groups = useMemo(() => groupBySegment(bom.items), [bom.items]);
+  const segmentsPresent = useMemo(() => groups.map(([seg]) => seg), [groups]);
+
+  const toggleCollapse = (seg) =>
     setCollapsed((prev) => {
       const next = new Set(prev);
-      if (next.has(cat)) next.delete(cat);
-      else next.add(cat);
+      next.has(seg) ? next.delete(seg) : next.add(seg);
       return next;
     });
+
+  const toggleHidden = (seg) =>
+    setHidden((prev) => {
+      const next = new Set(prev);
+      next.has(seg) ? next.delete(seg) : next.add(seg);
+      return next;
+    });
+
+  const visibleGroups = groups.filter(([seg]) => !hidden.has(seg));
 
   const colCount = showMargin ? 8 : 5;
   const th = 'px-4 py-2.5 font-medium';
@@ -47,10 +75,49 @@ export default function BOMTable({ bom, showMargin, setShowMargin }) {
 
   return (
     <div className="space-y-3">
-      <div className="flex justify-end">
-        <Button variant="outline" size="sm" onClick={() => setShowMargin((s) => !s)}>
-          {showMargin ? 'Hide Cost & Margin' : 'Show Cost & Margin'}
-        </Button>
+      {/* Filter + sort toolbar */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-1.5">
+          {segmentsPresent.map((seg) => {
+            const active = !hidden.has(seg);
+            return (
+              <button
+                key={seg}
+                type="button"
+                onClick={() => toggleHidden(seg)}
+                aria-pressed={active}
+                className={cn(
+                  'rounded-full border px-2.5 py-1 text-xs font-medium transition-colors',
+                  active
+                    ? 'border-blue-200 bg-blue-50 text-blue-700'
+                    : 'border-slate-200 bg-white text-slate-400 line-through'
+                )}
+              >
+                {seg}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="flex items-center gap-2">
+          <label className="flex items-center gap-1.5 text-xs text-slate-500">
+            Sort
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-xs text-slate-700 shadow-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+            >
+              {SORTS.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <Button variant="outline" size="sm" onClick={() => setShowMargin((s) => !s)}>
+            {showMargin ? 'Hide Cost & Margin' : 'Show Cost & Margin'}
+          </Button>
+        </div>
       </div>
 
       <Card className="overflow-hidden">
@@ -69,20 +136,31 @@ export default function BOMTable({ bom, showMargin, setShowMargin }) {
               </tr>
             </thead>
 
-            {groups.map(([cat, rows]) => {
+            {visibleGroups.length === 0 && (
+              <tbody>
+                <tr>
+                  <td colSpan={colCount} className="px-4 py-8 text-center text-sm text-slate-400">
+                    No items — all segments are filtered out.
+                  </td>
+                </tr>
+              </tbody>
+            )}
+
+            {visibleGroups.map(([seg, rows]) => {
               const subtotal = rows.reduce((s, r) => s + r.totalPrice, 0);
-              const open = !collapsed.has(cat);
+              const open = !collapsed.has(seg);
+              const sorted = sortItems(rows, sortBy);
               return (
-                <tbody key={cat}>
+                <tbody key={seg}>
                   <tr
                     className="cursor-pointer border-b border-slate-100 bg-slate-50 hover:bg-slate-100"
-                    onClick={() => toggle(cat)}
+                    onClick={() => toggleCollapse(seg)}
                   >
                     <td colSpan={colCount} className="px-4 py-2">
                       <div className="flex items-center justify-between gap-2">
                         <span className="flex items-center gap-2 text-sm font-semibold text-slate-700">
                           {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                          {cat}
+                          {seg}
                           <Badge className="border-slate-200 bg-white text-slate-500">
                             {rows.length}
                           </Badge>
@@ -95,14 +173,19 @@ export default function BOMTable({ bom, showMargin, setShowMargin }) {
                   </tr>
 
                   {open &&
-                    rows.map((r, i) => (
+                    sorted.map((r, i) => (
                       <tr
                         key={`${r.sku}-${i}`}
                         className="border-b border-slate-50 last:border-0 hover:bg-slate-50/60"
                       >
                         <td className={`${td} font-mono text-xs text-slate-500`}>{r.sku}</td>
                         <td className="min-w-[14rem] px-4 py-2 text-slate-700">
-                          {r.description}
+                          <span className="inline-flex items-center gap-2">
+                            <span>{r.description}</span>
+                            <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-400">
+                              {r.category}
+                            </span>
+                          </span>
                           {r.note && (
                             <span className="block text-xs italic text-slate-400">{r.note}</span>
                           )}

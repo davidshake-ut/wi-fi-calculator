@@ -48,7 +48,7 @@ function Calculator() {
   const [modal, setModal] = useState({ open: false, product: null });
   const [busy, setBusy] = useState(false);
 
-  const { allProducts, addProduct, editProduct, deleteProduct } = useProducts(session);
+  const { allProducts, addProduct, editProduct, deleteProduct, importProducts } = useProducts(session);
   const { projects, loadProject, saveProject, deleteProject } = useProjects(session, company, user);
 
   // Local mode (no backend) has no roles — the local user manages their own
@@ -302,6 +302,7 @@ function Calculator() {
               onAdd={() => setModal({ open: true, product: null })}
               onEdit={(p) => setModal({ open: true, product: p })}
               onDelete={removeCatalog}
+              onImport={importProducts}
             />
           )}
         </main>

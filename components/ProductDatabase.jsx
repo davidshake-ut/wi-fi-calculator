@@ -1,9 +1,11 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { Pencil, RotateCcw, Search, Trash2 } from 'lucide-react';
+import { useMemo, useRef, useState } from 'react';
+import { Download, Pencil, RotateCcw, Search, Trash2, Upload } from 'lucide-react';
 import { Card, Button, Badge, TextInput } from '@/components/ui/primitives';
 import { CORE_SKUS } from '@/lib/catalog';
+import { parseCatalogCSV } from '@/lib/csv';
+import { exportCatalogCSV } from '@/lib/exportCSV';
 import { currency } from '@/lib/format';
 
 export default function ProductDatabase({
@@ -13,9 +15,38 @@ export default function ProductDatabase({
   onAdd, // Phase D
   onEdit, // Phase D
   onDelete, // Phase D
+  onImport,
   canManageCatalog = false,
 }) {
   const [search, setSearch] = useState('');
+  const [importing, setImporting] = useState(false);
+  const fileRef = useRef(null);
+
+  const handleFile = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-importing the same file
+    if (!file) return;
+    setImporting(true);
+    try {
+      const text = await file.text();
+      const { products, errors } = parseCatalogCSV(text);
+      if (products.length === 0) {
+        alert(`No products imported.\n\n${errors.join('\n') || 'No valid rows found.'}`);
+        return;
+      }
+      const res = await onImport(products);
+      const summary = `Imported ${products.length} row(s): ${res.added} added, ${res.updated} updated.`;
+      alert(
+        errors.length
+          ? `${summary}\n\nSkipped ${errors.length} row(s):\n${errors.join('\n')}`
+          : summary
+      );
+    } catch (err) {
+      alert(`Import failed: ${err.message}`);
+    } finally {
+      setImporting(false);
+    }
+  };
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -60,7 +91,7 @@ export default function ProductDatabase({
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button
             variant="outline"
             size="sm"
@@ -69,10 +100,30 @@ export default function ProductDatabase({
           >
             Reset All Prices
           </Button>
+          <Button variant="outline" size="sm" onClick={() => exportCatalogCSV(allProducts)}>
+            <Download size={14} /> Export CSV
+          </Button>
           {canManageCatalog && (
-            <Button size="sm" onClick={onAdd}>
-              Add Product
-            </Button>
+            <>
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".csv,text/csv"
+                className="hidden"
+                onChange={handleFile}
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={importing}
+                onClick={() => fileRef.current?.click()}
+              >
+                <Upload size={14} /> {importing ? 'Importing…' : 'Import CSV'}
+              </Button>
+              <Button size="sm" onClick={onAdd}>
+                Add Product
+              </Button>
+            </>
           )}
         </div>
       </div>
@@ -167,7 +218,9 @@ export default function ProductDatabase({
       </div>
       <p className="border-t border-slate-100 px-4 py-2 text-xs text-slate-400">
         Cost/price edits here are <strong>per-project</strong> overrides saved with the project.
-        Catalog Add/Edit/Delete (company-admin+) writes to the global product database.
+        Catalog Add/Edit/Delete writes to the product database.{' '}
+        <strong>Import CSV</strong> adds/updates products using the{' '}
+        <strong>Export CSV</strong> template columns: SKU, Description, Category, Cost, Price.
       </p>
     </Card>
   );

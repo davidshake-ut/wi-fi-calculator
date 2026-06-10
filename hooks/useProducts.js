@@ -136,11 +136,56 @@ export function useProducts(session) {
     writeLocal(rows);
   };
 
+  // Bulk upsert from a CSV import (add new + update existing) in one write.
+  const importLocal = (rows) => {
+    const list = readLocalArray();
+    const bySku = new Map(list.map((r) => [r.sku, r]));
+    let added = 0;
+    let updated = 0;
+    for (const r of rows) {
+      const isBase = baseSkus.has(r.sku);
+      if (bySku.has(r.sku) || isBase) updated++;
+      else added++;
+      bySku.set(r.sku, {
+        ...(bySku.get(r.sku) || {}),
+        sku: r.sku,
+        description: r.description,
+        category: r.category,
+        cost: Number(r.cost),
+        price: Number(r.price),
+        is_custom: !isBase,
+        is_deleted: false,
+      });
+    }
+    writeLocal([...bySku.values()]);
+    return { added, updated };
+  };
+
+  const importProducts = async (rows) => {
+    if (!supabase) return importLocal(rows);
+    // Configured backend: upsert each row through the privileged route handler.
+    let added = 0;
+    let updated = 0;
+    for (const r of rows) {
+      await callApi('PATCH', {
+        sku: r.sku,
+        description: r.description,
+        category: r.category,
+        cost: Number(r.cost),
+        price: Number(r.price),
+      });
+      if (baseSkus.has(r.sku)) updated++;
+      else added++;
+    }
+    return { added, updated };
+  };
+
   return {
     allProducts: mergeProducts(customRows),
     refresh,
     addProduct: async (p) => (supabase ? callApi('POST', p) : addLocal(p)),
     editProduct: async (p) => (supabase ? callApi('PATCH', p) : editLocal(p)),
     deleteProduct: async (sku) => (supabase ? callApi('DELETE', { sku }) : deleteLocal(sku)),
+    importProducts,
   };
 }
