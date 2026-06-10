@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { getSupabase } from '@/lib/supabase/client';
-import { DEFAULT_INPUTS } from '@/lib/defaults';
+import { DEFAULT_INPUTS, DEFAULT_CAMERA_INPUTS } from '@/lib/defaults';
 
 // In local mode (no Supabase) projects are persisted to localStorage so the
 // user can still save and reopen projects. Rows use the same column shape as
@@ -97,13 +97,14 @@ export function useProjects(session, company, user) {
   const loadProject = useCallback((project) => {
     return {
       inputs: { ...DEFAULT_INPUTS, ...(project.inputs || {}) },
+      cameraInputs: { ...DEFAULT_CAMERA_INPUTS, ...(project.camera_inputs || {}) },
       priceOverrides: project.price_overrides || {},
       serviceOverrides: project.service_overrides || {},
     };
   }, []);
 
   const saveProject = useCallback(
-    async ({ id, projectName, inputs, priceOverrides, serviceOverrides }) => {
+    async ({ id, projectName, inputs, cameraInputs, priceOverrides, serviceOverrides }) => {
       if (!supabase) {
         const now = new Date().toISOString();
         const list = readLocalArray();
@@ -115,6 +116,7 @@ export function useProjects(session, company, user) {
             id,
             project_name: projectName,
             inputs,
+            camera_inputs: cameraInputs,
             price_overrides: priceOverrides,
             service_overrides: serviceOverrides,
             updated_at: now,
@@ -126,6 +128,7 @@ export function useProjects(session, company, user) {
             id: newLocalId(),
             project_name: projectName,
             inputs,
+            camera_inputs: cameraInputs,
             price_overrides: priceOverrides,
             service_overrides: serviceOverrides,
             created_at: now,
@@ -140,6 +143,7 @@ export function useProjects(session, company, user) {
       const payload = {
         project_name: projectName,
         inputs,
+        camera_inputs: cameraInputs,
         price_overrides: priceOverrides,
         service_overrides: serviceOverrides,
         company_id: company?.id ?? null,
