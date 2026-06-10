@@ -27,6 +27,7 @@ import { getTerminology } from '@/lib/terminology';
 import { exportPDF, wifiKpis, cameraKpis } from '@/lib/exportPDF';
 import { exportProposalPDF } from '@/lib/exportProposal';
 import { exportCSV } from '@/lib/exportCSV';
+import { buildScopeOfWork } from '@/lib/scopeOfWork';
 import { cn } from '@/lib/utils';
 
 const TABS = [
@@ -331,7 +332,12 @@ function Calculator() {
               )}
             </div>
           )}
-          {activeTab === 'summary' && <CostSummary bom={bom} />}
+          {activeTab === 'summary' && (
+            <CostSummary
+              sections={exportSections()}
+              scope={buildScopeOfWork({ inputs, cameraInputs, wifiBom: bom, cameraBom, term })}
+            />
+          )}
           {activeTab === 'cameras' && (
             <CameraSystems
               cameraBom={cameraBom}
