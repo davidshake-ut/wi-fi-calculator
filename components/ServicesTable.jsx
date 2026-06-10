@@ -1,17 +1,16 @@
 'use client';
 
 import { RotateCcw } from 'lucide-react';
-import { Card, Button } from '@/components/ui/primitives';
+import { Card } from '@/components/ui/primitives';
 import { currency, percent, marginColor } from '@/lib/format';
 
 export default function ServicesTable({
   bom,
+  title = 'Professional Services',
   serviceOverrides,
   setServiceOverrides,
   showMargin,
-  setShowMargin,
   editServices,
-  setEditServices,
 }) {
   const setOverride = (sku, patch, current) => {
     setServiceOverrides((prev) => ({
@@ -35,20 +34,8 @@ export default function ServicesTable({
 
   return (
     <Card className="overflow-hidden">
-      <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-4 py-2.5">
-        <h3 className="text-sm font-semibold text-slate-700">Professional Services</h3>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => setShowMargin((s) => !s)}>
-            {showMargin ? 'Hide Cost & Margin' : 'Show Cost & Margin'}
-          </Button>
-          <Button
-            variant={editServices ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setEditServices((e) => !e)}
-          >
-            {editServices ? 'Done Editing' : 'Edit Values'}
-          </Button>
-        </div>
+      <div className="border-b border-slate-100 px-4 py-2.5">
+        <h3 className="text-sm font-semibold text-slate-700">{title}</h3>
       </div>
 
       <div className="overflow-x-auto">

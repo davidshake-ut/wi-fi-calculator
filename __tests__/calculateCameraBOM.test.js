@@ -4,7 +4,7 @@ import { DEFAULT_CAMERA_INPUTS } from '../lib/defaults';
 import { BASE_PRODUCTS } from '../lib/catalog';
 
 const run = (overrides = {}, products = BASE_PRODUCTS) =>
-  calculateCameraBOM({ ...DEFAULT_CAMERA_INPUTS, ...overrides }, {}, products);
+  calculateCameraBOM({ ...DEFAULT_CAMERA_INPUTS, ...overrides }, {}, {}, products);
 
 const qtyOf = (bom, sku) =>
   bom.items.filter((i) => i.sku === sku).reduce((s, i) => s + i.qty, 0);
@@ -55,14 +55,17 @@ describe('camera BOM — storage by retention (1 HDD per NVR)', () => {
 });
 
 describe('camera BOM — pricing', () => {
-  it('uses dealer cost / MSRP price and adds 7% shipping', () => {
+  it('uses dealer cost / MSRP price, 7% hardware shipping, grand total = hw + labor + shipping', () => {
     const bom = run({ cam4mpBullet: 1 }); // 1 cam + 1 NVR + 1 8TB HDD
     // hardware price = 299 (cam) + 469 (NVR) + 279 (8TB) = 1047
     expect(bom.totalHardwarePrice).toBeCloseTo(1047, 2);
-    expect(bom.shippingPrice).toBeCloseTo(1047 * 0.07, 2);
-    expect(bom.grandTotalPrice).toBeCloseTo(1047 * 1.07, 2);
-    // cost = 119 + 190 + 236 = 545
-    expect(bom.totalHardwareCost).toBeCloseTo(545, 2);
+    expect(bom.totalHardwareCost).toBeCloseTo(545, 2); // 119 + 190 + 236
+    expect(bom.shippingPrice).toBeCloseTo(1047 * 0.07, 2); // shipping is on hardware only
+    expect(bom.totalServicesPrice).toBeGreaterThan(0);
+    expect(bom.grandTotalPrice).toBeCloseTo(
+      bom.totalHardwarePrice + bom.totalServicesPrice + bom.shippingPrice,
+      2
+    );
     expect(bom.overallMargin).toBeGreaterThan(0);
   });
 
@@ -70,11 +73,39 @@ describe('camera BOM — pricing', () => {
     const bom = calculateCameraBOM(
       { ...DEFAULT_CAMERA_INPUTS, cam4mpBullet: 1 },
       { 'IPC2124SR-ADF28KM-H': { cost: 100, price: 250 } },
+      {},
       BASE_PRODUCTS
     );
     const cam = bom.items.find((i) => i.sku === 'IPC2124SR-ADF28KM-H');
     expect(cam.unitPrice).toBe(250);
     expect(cam.unitCost).toBe(100);
+  });
+});
+
+describe('camera BOM — labor (separate from Wi-Fi)', () => {
+  it('no cameras → no labor lines', () => {
+    expect(run().serviceItems.length).toBe(0);
+  });
+
+  it('cameras → install / config / test labor', () => {
+    const bom = run({ cam4mpTurret: 8 });
+    const skus = bom.serviceItems.map((s) => s.sku);
+    expect(skus).toContain('CAM-INSTALL');
+    expect(skus).toContain('CAM-CONFIG');
+    expect(skus).toContain('CAM-TEST');
+    expect(bom.totalServicesPrice).toBeGreaterThan(0);
+  });
+
+  it('honors service overrides', () => {
+    const bom = calculateCameraBOM(
+      { ...DEFAULT_CAMERA_INPUTS, cam4mpTurret: 8 },
+      {},
+      { 'CAM-INSTALL': { cost: 10, price: 20 } },
+      BASE_PRODUCTS
+    );
+    const install = bom.serviceItems.find((s) => s.sku === 'CAM-INSTALL');
+    expect(install.unitPrice).toBe(20);
+    expect(install.unitCost).toBe(10);
   });
 });
 

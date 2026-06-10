@@ -26,10 +26,10 @@ import { exportCSV } from '@/lib/exportCSV';
 import { cn } from '@/lib/utils';
 
 const TABS = [
-  { id: 'hardware', label: 'Hardware & Software' },
+  { id: 'hardware', label: 'Managed Wi-Fi' },
+  { id: 'cameras', label: 'Camera Systems' },
   { id: 'services', label: 'Services' },
   { id: 'summary', label: 'Summary' },
-  { id: 'cameras', label: 'Camera Systems' },
   { id: 'products', label: 'Product Database' },
 ];
 
@@ -60,8 +60,8 @@ function Calculator() {
     [inputs, priceOverrides, serviceOverrides, allProducts]
   );
   const cameraBom = useMemo(
-    () => calculateCameraBOM(cameraInputs, priceOverrides, allProducts),
-    [cameraInputs, priceOverrides, allProducts]
+    () => calculateCameraBOM(cameraInputs, priceOverrides, serviceOverrides, allProducts),
+    [cameraInputs, priceOverrides, serviceOverrides, allProducts]
   );
   const term = getTerminology(inputs.propertyType);
 
@@ -248,15 +248,42 @@ function Calculator() {
             <BOMTable bom={bom} showMargin={showMargin} setShowMargin={setShowMargin} />
           )}
           {activeTab === 'services' && (
-            <ServicesTable
-              bom={bom}
-              serviceOverrides={serviceOverrides}
-              setServiceOverrides={setServiceOverrides}
-              showMargin={showMargin}
-              setShowMargin={setShowMargin}
-              editServices={editServices}
-              setEditServices={setEditServices}
-            />
+            <div className="space-y-4">
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" size="sm" onClick={() => setShowMargin((s) => !s)}>
+                  {showMargin ? 'Hide Cost & Margin' : 'Show Cost & Margin'}
+                </Button>
+                <Button
+                  variant={editServices ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setEditServices((e) => !e)}
+                >
+                  {editServices ? 'Done Editing' : 'Edit Values'}
+                </Button>
+              </div>
+              <ServicesTable
+                bom={bom}
+                title="Wi-Fi Professional Services"
+                serviceOverrides={serviceOverrides}
+                setServiceOverrides={setServiceOverrides}
+                showMargin={showMargin}
+                editServices={editServices}
+              />
+              {cameraBom.serviceItems.length > 0 ? (
+                <ServicesTable
+                  bom={cameraBom}
+                  title="Camera Professional Services"
+                  serviceOverrides={serviceOverrides}
+                  setServiceOverrides={setServiceOverrides}
+                  showMargin={showMargin}
+                  editServices={editServices}
+                />
+              ) : (
+                <p className="px-1 text-xs italic text-slate-400">
+                  Add cameras on the Camera Systems tab to generate camera labor here.
+                </p>
+              )}
+            </div>
           )}
           {activeTab === 'summary' && <CostSummary bom={bom} />}
           {activeTab === 'cameras' && (

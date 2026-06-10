@@ -90,6 +90,17 @@ export default function CameraSystems({ cameraBom, showMargin, setShowMargin }) 
                     {currency(cameraBom.totalHardwarePrice)}
                   </td>
                 </tr>
+                {cameraBom.totalServicesPrice > 0 && (
+                  <tr className="border-b border-slate-50">
+                    <td className="px-4 py-2.5 text-slate-700">
+                      Professional Services
+                      <span className="ml-1 text-xs text-slate-400">(see Services tab)</span>
+                    </td>
+                    <td className="px-4 py-2.5 text-right tabular-nums text-slate-700">
+                      {currency(cameraBom.totalServicesPrice)}
+                    </td>
+                  </tr>
+                )}
                 <tr className="border-b border-slate-50">
                   <td className="px-4 py-2.5 text-slate-700">Estimated Shipping (7%)</td>
                   <td className="px-4 py-2.5 text-right tabular-nums text-slate-700">
