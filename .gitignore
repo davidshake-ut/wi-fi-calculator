@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# generated/exported PDFs (the app downloads these client-side)
+*.pdf
