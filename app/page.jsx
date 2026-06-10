@@ -2,11 +2,13 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { FileDown, Sheet, Wifi, Save, Shield, LogOut } from 'lucide-react';
+import { FileDown, Sheet, Wifi, Save, Shield, LogOut, Settings } from 'lucide-react';
 import AuthGuard from '@/components/AuthGuard';
 import { useSession } from '@/components/SessionProvider';
 import InputPanel from '@/components/InputPanel';
 import CameraInputPanel from '@/components/CameraInputPanel';
+import BrandingModal from '@/components/BrandingModal';
+import { useBranding } from '@/hooks/useBranding';
 import SummaryCards from '@/components/SummaryCards';
 import BOMTable from '@/components/BOMTable';
 import ServicesTable from '@/components/ServicesTable';
@@ -46,8 +48,10 @@ function Calculator() {
   const [currentProjectId, setCurrentProjectId] = useState(null);
   const [savedSnapshot, setSavedSnapshot] = useState(null);
   const [modal, setModal] = useState({ open: false, product: null });
+  const [brandingOpen, setBrandingOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
+  const { branding, setBranding } = useBranding();
   const { allProducts, addProduct, editProduct, deleteProduct, importProducts } = useProducts(session);
   const { projects, loadProject, saveProject, deleteProject } = useProjects(session, company, user);
 
@@ -141,7 +145,8 @@ function Calculator() {
 
   const hasCameras = cameraBom.totalCameras > 0;
 
-  const handleExportCSV = () => exportCSV(inputs, exportSections(), { fileSuffix: 'Quote' });
+  const handleExportCSV = () =>
+    exportCSV(inputs, exportSections(), { fileSuffix: 'Quote', companyName: branding.companyName });
 
   const handleExportPDF = () =>
     exportPDF(inputs, exportSections(), {
@@ -150,6 +155,7 @@ function Calculator() {
         : 'Managed Wi-Fi — Budgetary Quote',
       footerLabel: hasCameras ? 'Managed Systems' : 'Managed Wi-Fi',
       fileSuffix: 'Quote',
+      branding,
     });
 
   const saveCatalog = async (form) => {
@@ -167,19 +173,31 @@ function Calculator() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="flex min-h-screen flex-col" style={{ '--brand': branding.primaryColor }}>
       <header className="sticky top-0 z-20 border-b border-slate-200/70 bg-white/80 backdrop-blur-md">
         <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <div className="flex items-center gap-2.5">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 text-white shadow-sm shadow-blue-600/30">
-              <Wifi size={18} />
-            </span>
+            {branding.logo?.dataUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={branding.logo.dataUrl}
+                alt={branding.companyName || 'Company logo'}
+                className="h-9 w-auto max-w-[160px] object-contain"
+              />
+            ) : (
+              <span
+                className="flex h-9 w-9 items-center justify-center rounded-xl text-white shadow-sm"
+                style={{ background: branding.primaryColor }}
+              >
+                <Wifi size={18} />
+              </span>
+            )}
             <div className="leading-tight">
               <h1 className="text-sm font-semibold text-slate-900">
-                Managed Wi-Fi — BOM Calculator
+                {branding.companyName || 'Managed Wi-Fi — BOM Calculator'}
               </h1>
               <p className="text-xs text-slate-400">
-                {company?.name || inputs.propertyName || 'Untitled Project'}
+                {inputs.propertyName || company?.name || 'Untitled Project'}
               </p>
             </div>
           </div>
@@ -194,6 +212,13 @@ function Calculator() {
             <Button variant="outline" size="sm" onClick={handleExportPDF}>
               <FileDown size={14} /> PDF
             </Button>
+            <button
+              onClick={() => setBrandingOpen(true)}
+              title="Branding settings"
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 shadow-sm hover:bg-slate-50 hover:text-slate-700"
+            >
+              <Settings size={15} />
+            </button>
             {isSuperAdmin && (
               <Link
                 href="/admin"
@@ -236,7 +261,7 @@ function Calculator() {
                 className={cn(
                   'whitespace-nowrap rounded-lg px-3.5 py-1.5 text-sm font-medium transition-all',
                   activeTab === t.id
-                    ? 'bg-blue-600 text-white shadow-sm shadow-blue-600/25'
+                    ? 'bg-[var(--brand,#2563eb)] text-white shadow-sm'
                     : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
                 )}
               >
@@ -317,6 +342,16 @@ function Calculator() {
           product={modal.product}
           onClose={() => setModal({ open: false, product: null })}
           onSave={saveCatalog}
+        />
+      )}
+      {brandingOpen && (
+        <BrandingModal
+          branding={branding}
+          onSave={(b) => {
+            setBranding(b);
+            setBrandingOpen(false);
+          }}
+          onClose={() => setBrandingOpen(false)}
         />
       )}
     </div>

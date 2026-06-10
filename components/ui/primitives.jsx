@@ -17,7 +17,7 @@ export function Card({ className, ...props }) {
 export function Button({ className, variant = 'default', size = 'md', ...props }) {
   const variants = {
     default:
-      'bg-blue-600 text-white shadow-sm hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none',
+      'bg-[var(--brand,#2563eb)] text-white shadow-sm hover:brightness-110 disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none disabled:brightness-100',
     outline:
       'border border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50 hover:border-slate-300 disabled:opacity-50',
     ghost: 'text-slate-600 hover:bg-slate-100',
