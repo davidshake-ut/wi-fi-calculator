@@ -39,7 +39,7 @@ const TABS = [
 ];
 
 function Calculator() {
-  const { configured, session, company, user, isSuperAdmin, role, signOut } = useSession();
+  const { configured, session, company, user, isSuperAdmin, role, refresh, signOut } = useSession();
 
   const [inputs, setInputs] = useState(DEFAULT_INPUTS);
   const [cameraInputs, setCameraInputs] = useState(DEFAULT_CAMERA_INPUTS);
@@ -56,7 +56,7 @@ function Calculator() {
   const [brandingOpen, setBrandingOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  const { branding, setBranding } = useBranding();
+  const { branding, setBranding } = useBranding({ configured, company, onSaved: refresh });
   const { allProducts, addProduct, editProduct, deleteProduct, importProducts } = useProducts(session);
   const { projects, loadProject, saveProject, deleteProject } = useProjects(session, company, user);
 
@@ -266,13 +266,15 @@ function Calculator() {
             <Button size="sm" onClick={handleExportProposal} title="Customer-facing proposal (sell price only)">
               <FileText size={14} /> Proposal
             </Button>
-            <button
-              onClick={() => setBrandingOpen(true)}
-              title="Branding settings"
-              className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 shadow-sm hover:bg-slate-50 hover:text-slate-700"
-            >
-              <Settings size={15} />
-            </button>
+            {canManageCatalog && (
+              <button
+                onClick={() => setBrandingOpen(true)}
+                title="Branding settings"
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 shadow-sm hover:bg-slate-50 hover:text-slate-700"
+              >
+                <Settings size={15} />
+              </button>
+            )}
             {isSuperAdmin && (
               <Link
                 href="/admin"
@@ -422,9 +424,13 @@ function Calculator() {
       {brandingOpen && (
         <BrandingModal
           branding={branding}
-          onSave={(b) => {
-            setBranding(b);
-            setBrandingOpen(false);
+          onSave={async (b) => {
+            try {
+              await setBranding(b);
+              setBrandingOpen(false);
+            } catch (e) {
+              alert(`Could not save branding: ${e.message}`);
+            }
           }}
           onClose={() => setBrandingOpen(false)}
         />

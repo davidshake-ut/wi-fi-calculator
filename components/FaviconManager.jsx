@@ -1,13 +1,15 @@
 'use client';
 
 import { useEffect } from 'react';
+import { useSession } from '@/components/SessionProvider';
 import { useBranding } from '@/hooks/useBranding';
 
 // Mirrors the branding logo into the browser tab favicon. When a logo is set we
 // append a dedicated <link rel="icon"> (last one wins); when cleared we remove
 // it so the default favicon.ico applies again. DOM-only — no React state.
 export default function FaviconManager() {
-  const { branding } = useBranding();
+  const { configured, company } = useSession();
+  const { branding } = useBranding({ configured, company });
   const href = branding.logo?.dataUrl || '';
 
   useEffect(() => {

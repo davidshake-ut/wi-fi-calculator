@@ -5,10 +5,11 @@ import { Wifi, Loader2 } from 'lucide-react';
 import { useSession } from '@/components/SessionProvider';
 import { getSupabase } from '@/lib/supabase/client';
 import { Card, Button, TextInput, Field } from '@/components/ui/primitives';
+import { cn } from '@/lib/utils';
 
 function Centered({ children }) {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
+    <div className="flex min-h-screen items-center justify-center bg-[#f6f7f9] p-4">
       <Card className="w-full max-w-sm p-6">{children}</Card>
     </div>
   );
@@ -16,39 +17,88 @@ function Centered({ children }) {
 
 function LoginScreen() {
   const supabase = getSupabase();
+  const [mode, setMode] = useState('password'); // 'password' | 'code'
   const [email, setEmail] = useState('');
-  const [sent, setSent] = useState(false);
+  const [password, setPassword] = useState('');
+  const [code, setCode] = useState('');
+  const [codeSent, setCodeSent] = useState(false);
   const [err, setErr] = useState(null);
   const [busy, setBusy] = useState(false);
 
-  const signIn = async (e) => {
+  const reset = (next) => {
+    setMode(next);
+    setErr(null);
+    setCodeSent(false);
+    setCode('');
+  };
+
+  const signInPassword = async (e) => {
+    e.preventDefault();
+    setBusy(true);
+    setErr(null);
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    setBusy(false);
+    if (error) setErr(error.message);
+    // success → onAuthStateChange updates the session
+  };
+
+  const sendCode = async (e) => {
     e.preventDefault();
     setBusy(true);
     setErr(null);
     const { error } = await supabase.auth.signInWithOtp({
       email,
-      options: { emailRedirectTo: typeof window !== 'undefined' ? window.location.origin : undefined },
+      options: {
+        shouldCreateUser: false,
+        emailRedirectTo: typeof window !== 'undefined' ? window.location.origin : undefined,
+      },
     });
     setBusy(false);
     if (error) setErr(error.message);
-    else setSent(true);
+    else setCodeSent(true);
+  };
+
+  const verifyCode = async (e) => {
+    e.preventDefault();
+    setBusy(true);
+    setErr(null);
+    const { error } = await supabase.auth.verifyOtp({ email, token: code.trim(), type: 'email' });
+    setBusy(false);
+    if (error) setErr(error.message);
+    // success → onAuthStateChange updates the session
   };
 
   return (
     <Centered>
       <div className="mb-5 flex items-center gap-2">
-        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-700 text-white">
+        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 text-white shadow-sm">
           <Wifi size={18} />
         </span>
         <h1 className="text-sm font-semibold text-slate-800">Managed Wi-Fi BOM Calculator</h1>
       </div>
-      {sent ? (
-        <p className="text-sm text-slate-600">
-          Check <strong>{email}</strong> for a magic sign-in link.
-        </p>
-      ) : (
-        <form onSubmit={signIn} className="space-y-3">
-          <Field label="Work Email">
+
+      <div className="mb-4 flex rounded-lg border border-slate-200 bg-slate-100/80 p-1 text-xs font-medium">
+        {[
+          ['password', 'Password'],
+          ['code', 'Email code'],
+        ].map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => reset(id)}
+            className={cn(
+              'flex-1 rounded-md px-2 py-1.5 transition-all',
+              mode === id ? 'bg-white text-blue-600 shadow-sm ring-1 ring-slate-900/5' : 'text-slate-500'
+            )}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {mode === 'password' && (
+        <form onSubmit={signInPassword} className="space-y-3">
+          <Field label="Email">
             <TextInput
               type="email"
               required
@@ -57,13 +107,72 @@ function LoginScreen() {
               placeholder="you@company.com"
             />
           </Field>
+          <Field label="Password">
+            <TextInput
+              type="password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+            />
+          </Field>
           {err && <p className="text-xs text-red-600">{err}</p>}
           <Button type="submit" className="w-full" disabled={busy}>
-            {busy ? 'Sending…' : 'Send Magic Link'}
+            {busy ? 'Signing in…' : 'Sign In'}
           </Button>
-          <p className="text-center text-xs text-slate-400">Access is invite-only.</p>
         </form>
       )}
+
+      {mode === 'code' &&
+        (codeSent ? (
+          <form onSubmit={verifyCode} className="space-y-3">
+            <p className="text-xs text-slate-500">
+              We sent a login code to <strong>{email}</strong>. Enter it below (or click the link in
+              the email).
+            </p>
+            <Field label="Login code">
+              <TextInput
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                required
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                placeholder="123456"
+              />
+            </Field>
+            {err && <p className="text-xs text-red-600">{err}</p>}
+            <Button type="submit" className="w-full" disabled={busy}>
+              {busy ? 'Verifying…' : 'Verify & Sign In'}
+            </Button>
+            <button
+              type="button"
+              onClick={() => setCodeSent(false)}
+              className="w-full text-center text-xs text-slate-400 hover:text-slate-600"
+            >
+              Use a different email
+            </button>
+          </form>
+        ) : (
+          <form onSubmit={sendCode} className="space-y-3">
+            <Field label="Email">
+              <TextInput
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@company.com"
+              />
+            </Field>
+            {err && <p className="text-xs text-red-600">{err}</p>}
+            <Button type="submit" className="w-full" disabled={busy}>
+              {busy ? 'Sending…' : 'Email me a login code'}
+            </Button>
+          </form>
+        ))}
+
+      <p className="mt-4 text-center text-xs text-slate-400">
+        Access is invite-only. Ask your team admin for an invitation.
+      </p>
     </Centered>
   );
 }
@@ -86,12 +195,13 @@ export default function AuthGuard({ children, requireSuperAdmin = false }) {
 
   if (!session) return <LoginScreen />;
 
-  if (error === 'company_not_recognized') {
+  if (error === 'no_team') {
     return (
       <Centered>
-        <h2 className="mb-2 text-base font-semibold text-slate-800">Company Not Recognized</h2>
+        <h2 className="mb-2 text-base font-semibold text-slate-800">You&apos;re not on a team yet</h2>
         <p className="text-sm text-slate-600">
-          Your email domain isn’t linked to a company. Contact an administrator.
+          Your account isn&apos;t assigned to a team. Ask your administrator to add you, then sign in
+          again.
         </p>
         <Button variant="outline" className="mt-4 w-full" onClick={signOut}>
           Sign out
