@@ -1,7 +1,8 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { getSupabase } from '@/lib/supabase/client';
 import { FileDown, FileText, Sheet, Wifi, Save, Shield, LogOut, Settings } from 'lucide-react';
 import AuthGuard from '@/components/AuthGuard';
 import { useSession } from '@/components/SessionProvider';
@@ -57,15 +58,36 @@ function Calculator() {
   const [brandingOpen, setBrandingOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
+  // Super admins see every team's custom catalog rows (by RLS). The Product
+  // Database filter lets them scope the catalog to one team (or 'all').
+  const [catalogTeamId, setCatalogTeamId] = useState('all');
+  const [teams, setTeams] = useState([]);
+
+  useEffect(() => {
+    const supabase = getSupabase();
+    if (!(isSuperAdmin && session && supabase)) return;
+    void (async () => {
+      const { data } = await supabase.from('companies').select('id, name').order('name');
+      setTeams(data || []);
+    })();
+  }, [isSuperAdmin, session]);
+
   const { branding, setBranding } = useBranding({ configured, company, onSaved: refresh });
-  const { allProducts, addProduct, editProduct, deleteProduct, importProducts } = useProducts(session);
+  const { allProducts, addProduct, editProduct, deleteProduct, importProducts } = useProducts(
+    session,
+    { teamFilter: catalogTeamId }
+  );
   const { projects, loadProject, saveProject, deleteProject } = useProjects(session, company, user);
 
   // Local mode (no backend) has no roles. In team mode, catalog + branding are
   // Admin-only AND require a team to act on (a super admin with no team has no
   // catalog to manage). The API + branding save also enforce this server-side.
+  // Catalog writes always target the caller's own team, so when a super admin
+  // filters to a *different* team the catalog is view-only (no misleading edits).
   const canManageCatalog = configured
-    ? (role === 'company_admin' || isSuperAdmin) && !!company
+    ? (role === 'company_admin' || isSuperAdmin) &&
+      !!company &&
+      (!isSuperAdmin || catalogTeamId === 'all' || catalogTeamId === company.id)
     : true;
 
   const bom = useMemo(
@@ -418,6 +440,9 @@ function Calculator() {
             <ProductDatabase
               allProducts={allProducts}
               canManageCatalog={canManageCatalog}
+              teams={isSuperAdmin ? teams : null}
+              teamFilter={catalogTeamId}
+              onTeamFilterChange={setCatalogTeamId}
               onAdd={() => setModal({ open: true, product: null })}
               onEdit={(p) => setModal({ open: true, product: p })}
               onClone={(p) =>

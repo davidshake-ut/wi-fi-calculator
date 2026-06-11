@@ -26,6 +26,9 @@ export default function ProductDatabase({
   onDelete,
   onImport,
   canManageCatalog = false,
+  teams = null, // super-admin only: [{ id, name }] to enable the team filter
+  teamFilter = 'all',
+  onTeamFilterChange,
 }) {
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
@@ -146,6 +149,21 @@ export default function ProductDatabase({
               </option>
             ))}
           </select>
+          {teams && teams.length > 0 && (
+            <select
+              value={teamFilter}
+              onChange={(e) => onTeamFilterChange?.(e.target.value)}
+              title="Filter the catalog by team"
+              className="h-9 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-700 shadow-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+            >
+              <option value="all">All Teams</option>
+              {teams.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" size="sm" onClick={() => exportCatalogCSV(allProducts)}>

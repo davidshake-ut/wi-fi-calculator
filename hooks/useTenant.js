@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { getSupabase, isSupabaseConfigured } from '@/lib/supabase/client';
 
 // Resolves the signed-in user, their role, and their team (company).
@@ -16,17 +16,27 @@ export function useTenant() {
   const [company, setCompany] = useState(null);
   const [loading, setLoading] = useState(isSupabaseConfigured);
   const [error, setError] = useState(null);
+  // Monotonic token: rapid auth events can launch overlapping resolutions that
+  // finish out of order. Only the latest call may write state — a stale one
+  // (superseded, or fired after unmount) becomes a no-op.
+  const reqId = useRef(0);
 
   const resolve = useCallback(
     async (activeSession) => {
+      const myId = ++reqId.current;
+      const fresh = () => myId === reqId.current;
       if (!supabase || !activeSession) {
-        setUser(null);
-        setCompany(null);
-        setLoading(false);
+        if (fresh()) {
+          setUser(null);
+          setCompany(null);
+          setLoading(false);
+        }
         return;
       }
-      setLoading(true);
-      setError(null);
+      if (fresh()) {
+        setLoading(true);
+        setError(null);
+      }
       try {
         const authId = activeSession.user.id;
         const { data: profile, error: pErr } = await supabase
@@ -35,27 +45,33 @@ export function useTenant() {
           .eq('id', authId)
           .single();
         if (pErr) throw pErr;
+        if (!fresh()) return;
         setUser(profile);
 
         // Resolve the team for ANY role with a company_id (a super admin may
         // also belong to a team to use the per-team features). A non-super user
         // with no team is awaiting assignment.
         if (profile.company_id) {
-          const { data: comp } = await supabase
+          const { data: comp, error: cErr } = await supabase
             .from('companies')
             .select('*')
             .eq('id', profile.company_id)
             .single();
+          // PGRST116 = "no rows" (company genuinely missing); anything else is a
+          // real failure and must surface as such, not be mislabeled 'no_team'.
+          if (cErr && cErr.code !== 'PGRST116') throw cErr;
+          if (!fresh()) return;
           setCompany(comp || null);
           if (!comp && profile.role !== 'super_admin') setError('no_team');
         } else {
+          if (!fresh()) return;
           setCompany(null);
           if (profile.role !== 'super_admin') setError('no_team');
         }
       } catch (e) {
-        setError(e.message || 'resolution_failed');
+        if (fresh()) setError(e.message || 'resolution_failed');
       } finally {
-        setLoading(false);
+        if (fresh()) setLoading(false);
       }
     },
     [supabase]
@@ -75,6 +91,7 @@ export function useTenant() {
     });
     return () => {
       active = false;
+      reqId.current += 1; // invalidate any in-flight resolution after unmount
       sub.subscription.unsubscribe();
     };
   }, [supabase, resolve]);

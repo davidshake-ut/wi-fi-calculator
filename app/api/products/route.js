@@ -36,9 +36,28 @@ export async function POST(request) {
   const { sku, description, category, cost, price } = body;
   if (!sku || !description || !category) return json({ error: 'Missing fields' }, 400);
 
+  // Reject only SKUs that are currently live for this team. A base product is
+  // live unless an override row hides it; a custom SKU is live while it has an
+  // active row. A previously-deleted product (soft-deleted override) can be
+  // re-added — upsert revives that row instead of hitting the unique index and
+  // erroring (matches local mode).
+  const isBase = baseSkus.has(sku);
+  const { data: existing } = await svc
+    .from('custom_products')
+    .select('id, is_deleted')
+    .eq('company_id', companyId)
+    .eq('sku', sku)
+    .maybeSingle();
+  if ((isBase && !existing) || (existing && !existing.is_deleted)) {
+    return json({ error: `SKU ${sku} already exists` }, 409);
+  }
+
   const { data, error: dbErr } = await svc
     .from('custom_products')
-    .insert({ company_id: companyId, sku, description, category, cost, price, is_custom: true, is_deleted: false })
+    .upsert(
+      { company_id: companyId, sku, description, category, cost, price, is_custom: !isBase, is_deleted: false },
+      { onConflict: 'company_id,sku' }
+    )
     .select()
     .single();
   if (dbErr) return json({ error: dbErr.message }, 400);

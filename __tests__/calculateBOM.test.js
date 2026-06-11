@@ -91,6 +91,21 @@ describe('Single-IDF deployment (fix #1 regression)', () => {
   });
 });
 
+describe('High-density IDF prefers 48-port switches (review fix)', () => {
+  const bom = run({ numberOfRooms: 200, numberOfIDFs: 1 });
+
+  it('packs >46 ports onto 48-port switches instead of fanning out 24s', () => {
+    expect(bom.totalPoEPorts).toBeGreaterThan(46);
+    expect(bom.idfSwitches48).toBeGreaterThanOrEqual(1);
+    // At most one 24-port switch remains (the small remainder); no 24-port fan-out.
+    expect(bom.idfSwitches24).toBeLessThanOrEqual(1);
+    // Switch capacity still covers every PoE port.
+    expect(bom.idfSwitches48 * 46 + bom.idfSwitches24 * 22).toBeGreaterThanOrEqual(
+      bom.totalPoEPorts,
+    );
+  });
+});
+
 describe('Aggregate switch type', () => {
   it('multi-IDF fiber adds SFP modules', () => {
     const bom = run({ aggSwitchType: 'fiber' });

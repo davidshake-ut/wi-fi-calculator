@@ -62,11 +62,18 @@ function readLocalArray() {
 
 // Loads custom_products and merges them over the static base catalog.
 // In local mode the custom rows come from localStorage instead.
-export function useProducts(session) {
+export function useProducts(session, { teamFilter = 'all' } = {}) {
   const supabase = getSupabase();
   const localRows = useSyncExternalStore(subscribeLocal, getLocalSnapshot, getLocalServerSnapshot);
   const [remoteRows, setRemoteRows] = useState([]);
-  const customRows = supabase ? remoteRows : localRows;
+  const rawRows = supabase ? remoteRows : localRows;
+  // A super admin's read returns every team's custom rows (by RLS); scope the
+  // catalog to the team chosen in the Product Database filter. 'all' = no filter
+  // (and a regular user's rows are already team-scoped, so this is a no-op).
+  const customRows =
+    supabase && teamFilter && teamFilter !== 'all'
+      ? rawRows.filter((r) => r.company_id === teamFilter)
+      : rawRows;
 
   const refresh = useCallback(async () => {
     if (!supabase) return;
@@ -108,12 +115,18 @@ export function useProducts(session) {
   const addLocal = ({ sku, description, category, cost, price }) => {
     if (!sku || !description || !category) throw new Error('Missing fields');
     const rows = readLocalArray();
-    if (baseSkus.has(sku) || rows.some((r) => r.sku === sku && !r.is_deleted)) {
+    const existing = rows.find((r) => r.sku === sku);
+    const isBase = baseSkus.has(sku);
+    // Reject only SKUs that are currently live: a base product with no override,
+    // or any active row. A previously-deleted product (soft-deleted override)
+    // can be re-added — it revives the row instead of erroring.
+    const liveBase = isBase && !existing;
+    if (liveBase || (existing && !existing.is_deleted)) {
       throw new Error(`SKU ${sku} already exists`);
     }
     writeLocal([
       ...rows.filter((r) => r.sku !== sku),
-      { sku, description, category, cost: Number(cost), price: Number(price), is_custom: true, is_deleted: false },
+      { sku, description, category, cost: Number(cost), price: Number(price), is_custom: !isBase, is_deleted: false },
     ]);
   };
 
