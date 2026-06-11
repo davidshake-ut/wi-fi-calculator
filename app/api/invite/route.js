@@ -28,7 +28,13 @@ export async function POST(request) {
   }
 
   const svc = getServiceClient();
-  const { data, error } = await svc.auth.admin.inviteUserByEmail(email);
+  // Send invitees to the set-password page after they accept.
+  const host = request.headers.get('x-forwarded-host') || request.headers.get('host');
+  const proto = request.headers.get('x-forwarded-proto') || 'https';
+  const origin = host ? `${proto}://${host}` : new URL(request.url).origin;
+  const { data, error } = await svc.auth.admin.inviteUserByEmail(email, {
+    redirectTo: `${origin}/welcome`,
+  });
   if (error) return json({ error: error.message }, 400);
 
   // The on_auth_user_created trigger inserts the public.users row; set the
