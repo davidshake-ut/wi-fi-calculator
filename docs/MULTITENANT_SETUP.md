@@ -67,8 +67,12 @@ Supabase dashboard → **Authentication**:
 2. **Providers → Email → "Confirm email"**: on for production.
 3. **Sign-ups**: turn **OFF** "Allow new users to sign up". Membership is
    invite-only — only people you or a team Admin invite can get in.
-4. **URL Configuration**: set **Site URL** to your Vercel URL
-   (e.g. `https://wi-fi-calculator.vercel.app`) and add it under **Redirect URLs**.
+4. **URL Configuration** (Authentication → URL Configuration) — **required**, or
+   invite/login links fail with `{"error":"requested path is invalid"}`:
+   - **Site URL**: your app URL, e.g. `https://wi-fi-calculator.vercel.app`
+     (no trailing slash).
+   - **Redirect URLs**: add `https://wi-fi-calculator.vercel.app/**` (the `/**`
+     wildcard allows any path). Add any custom domain here too.
 5. (Optional, recommended for volume) **Email Templates / SMTP**: Supabase's
    built-in email is rate-limited; for real use, connect your own SMTP
    (Settings → Auth → SMTP).
