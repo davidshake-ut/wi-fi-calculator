@@ -32,6 +32,9 @@ export default function ServicesTable({
     });
   };
 
+  // Editing cost requires the cost column to be visible (mirrors BOMTable).
+  const showCost = showMargin || editServices;
+
   return (
     <Card className="overflow-hidden">
       <div className="border-b border-slate-100 px-4 py-2.5">
@@ -43,7 +46,7 @@ export default function ServicesTable({
           <thead>
             <tr className="border-b border-slate-100 text-left text-xs text-slate-400">
               <th className="px-4 py-2 font-medium">Service</th>
-              {showMargin && <th className="px-4 py-2 text-right font-medium">Cost</th>}
+              {showCost && <th className="px-4 py-2 text-right font-medium">Cost</th>}
               <th className="px-4 py-2 text-right font-medium">Price</th>
               {showMargin && <th className="px-4 py-2 text-right font-medium">Margin</th>}
               <th className="w-8" />
@@ -61,11 +64,13 @@ export default function ServicesTable({
                     {s.description}
                     {s.note && <span className="block text-xs italic text-slate-400">{s.note}</span>}
                   </td>
-                  {showMargin && (
+                  {showCost && (
                     <td className="px-4 py-2 text-right tabular-nums text-slate-500">
                       {editServices ? (
                         <input
                           type="number"
+                          min="0"
+                          step="0.01"
                           className="h-7 w-24 rounded border border-slate-300 px-2 text-right text-xs"
                           value={s.unitCost}
                           onChange={(e) => setOverride(s.sku, { cost: Number(e.target.value) }, s)}
@@ -79,6 +84,8 @@ export default function ServicesTable({
                     {editServices ? (
                       <input
                         type="number"
+                        min="0"
+                        step="0.01"
                         className="h-7 w-24 rounded border border-slate-300 px-2 text-right text-xs"
                         value={s.unitPrice}
                         onChange={(e) => setOverride(s.sku, { price: Number(e.target.value) }, s)}
@@ -112,7 +119,7 @@ export default function ServicesTable({
           <tfoot>
             <tr className="border-t border-slate-200 font-semibold">
               <td className="px-4 py-2.5 text-slate-700">Services Subtotal</td>
-              {showMargin && (
+              {showCost && (
                 <td className="px-4 py-2.5 text-right tabular-nums text-slate-500">
                   {currency(bom.totalServicesCost)}
                 </td>

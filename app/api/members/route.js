@@ -22,6 +22,10 @@ async function resolve(request, targetUserId) {
   if (caller.role !== 'super_admin' && target.company_id !== caller.company_id) {
     return { error: json({ error: 'Forbidden — not your team' }, 403) };
   }
+  // Only a super admin may modify a super admin.
+  if (target.role === 'super_admin' && caller.role !== 'super_admin') {
+    return { error: json({ error: 'Forbidden — cannot modify a super admin' }, 403) };
+  }
   return { caller, svc, target };
 }
 

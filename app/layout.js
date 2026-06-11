@@ -5,7 +5,7 @@ import FaviconManager from "@/components/FaviconManager";
 export const metadata = {
   title: "Managed Wi-Fi BOM Calculator",
   description:
-    "Generate itemized hardware BOMs, cnMaestro subscriptions, and professional services quotes for managed Wi-Fi deployments.",
+    "Generate itemized hardware BOMs, software subscriptions, and professional-services quotes for managed Wi-Fi and camera-system deployments.",
 };
 
 export default function RootLayout({ children }) {

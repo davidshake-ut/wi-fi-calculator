@@ -1,60 +1,66 @@
-# Cambium Managed Wi-Fi — BOM Calculator
+# Managed Wi-Fi & Camera Systems — BOM Calculator
 
-Multi-tenant SaaS that generates itemized hardware BOMs, cnMaestro subscription
-lines, professional-services estimates, and PDF/CSV exports for Cambium Wi-Fi
-deployments (Hospitality, Senior Living, Multi-Family).
+A multi-tenant SaaS that generates itemized hardware bills of materials,
+software subscriptions, professional-services/labor estimates, and branded
+**PDF / CSV exports and customer proposals** for **managed Wi-Fi** and **IP
+camera** deployments (Hospitality, Senior Living, Multi-Family).
 
-Built from `docs/Updates spec from Claude - CLAUDE_CODE_BUILD_GUIDE.md`.
+**Stack:** Next.js 16 (App Router, Turbopack) · React 19 · Tailwind v4 ·
+Supabase (Auth + Postgres + Row-Level Security) · jsPDF. Deploys to Vercel.
 
-**Stack:** Next.js 16 (App Router) · React 19 · Tailwind v4 · Supabase (Auth +
-Postgres + RLS) · jsPDF. Deploys to Vercel.
+## Two modes
+
+- **Local mode** (no setup): single user, data in the browser. The calculator,
+  catalog edits, per-project pricing, custom line items, branding, and all
+  exports work with zero configuration.
+- **Team mode** (Supabase configured): real accounts and multiple teams, each
+  team's projects / product catalog / branding fully isolated by Row-Level
+  Security. Roles: **User** (build/save projects), **Admin** (+ catalog,
+  branding, invites), **Super admin** (all teams).
 
 ## Running locally
 
 ```bash
 npm install
 npm run dev          # http://localhost:3000
-npm test             # vitest — calculation-engine suite
+npm test             # vitest — calculation-engine + helpers
 npm run build        # production build
+npm run lint
 ```
 
-**Local mode:** with no Supabase env vars set, the app runs without auth — the
-calculator, product overrides, and PDF/CSV exports all work; only login,
-project save/load, and the admin panel are disabled.
+## Enabling team mode
 
-## Enabling the backend
+See **[docs/MULTITENANT_SETUP.md](docs/MULTITENANT_SETUP.md)** for the full
+walk-through. In short:
 
 1. Create a Supabase project.
-2. Run `supabase/migrations/0001_init.sql` in the SQL editor (schema, RLS,
-   `auth.users → public.users` trigger).
-3. Copy `.env.example` to `.env.local` and fill in:
-   - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-   - `SUPABASE_SERVICE_ROLE_KEY` (server-only — used by the `/api/*` route handlers)
-4. In Supabase Auth: enable the Email provider and disable public sign-ups
-   (access is invite-only via the admin panel).
-5. Seed a company and promote your user to `super_admin` (set `role` in the
-   `public.users` row) to reach `/admin`.
+2. Run **all** migrations in `supabase/migrations/` in order
+   (`0001`→`0004`), or paste **[docs/all-migrations.sql](docs/all-migrations.sql)**
+   into the SQL editor.
+3. Set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and
+   `SUPABASE_SERVICE_ROLE_KEY` (server-only) — in Vercel and/or `.env.local`.
+4. In Supabase Auth: enable the **Email** provider and set the Site URL +
+   Redirect URLs. Membership is invite-only (the app exposes no sign-up screen).
+5. Promote your account to `super_admin`, then create teams and invite admins
+   from the in-app console.
 
 ## Architecture
 
-- `lib/calculateBOM.js` — pure calculation engine (no I/O). Unit-tested in
-  `__tests__/calculateBOM.test.js`.
-- `lib/catalog.js` — static base product catalog + `CORE_SKUS` guard set.
-- `lib/mergeProducts.js` — merges `custom_products` overrides over the base catalog.
-- `components/*` — calculator UI (input panel, BOM/services/summary tables,
-  product database, admin panel).
-- `app/api/products` · `app/api/invite` — privileged route handlers using the
-  service-role client; each re-checks the caller's role.
-- `hooks/useTenant|useProjects|useProducts` — auth/tenant resolution + data.
+- `lib/calculateBOM.js` / `lib/calculateCameraBOM.js` — pure calculation engines
+  (no I/O), unit-tested under `__tests__/`.
+- `lib/catalog.js` — base product catalog + `CORE_SKUS` guard; `lib/segments.js`
+  groups categories into BOM segments.
+- `lib/mergeProducts.js` — merges per-team `custom_products` over the base catalog.
+- `lib/exportCSV.js` · `lib/exportPDF.js` · `lib/exportProposal.js` ·
+  `lib/scopeOfWork.js` — exports (CSV, detailed PDF, customer proposal).
+- `components/*` — calculator UI (inputs, BOM/services/summary tables, camera
+  systems, product database, branding, admin console).
+- `app/api/products` · `app/api/invite` · `app/api/members` — privileged route
+  handlers using the service-role client; each re-checks the caller's role and
+  team. `app/welcome` — invite/password-reset landing.
+- `hooks/useTenant|useProjects|useProducts|useBranding` — auth/tenant resolution
+  and data, with localStorage fallbacks in local mode.
 
-## Deviations from the original spec (intentional)
-
-These were resolved during review (see the plan / critique):
-
-1. **Single-IDF deployment yields one switch.** The IDF edge switch *is* the
-   core — the spec's duplicate "Core HSIA Switch" was removed.
-2. **Catalog mutations are restricted** to `company_admin` / `super_admin`
-   (RLS + UI gating); regular users keep per-project price overrides.
-3. **Core products cannot be deleted** and a missing SKU never crashes a BOM.
-4. **`numberOfIDFs` is floored at 1**; **Wi-Fi 7 forces hallway** in the engine,
-   not just the UI; `custom_products`/`users` have explicit RLS policies.
+> Note: catalog product descriptions retain real vendor names (e.g. "Cambium
+> XV2-21X", "Uniview 4MP…") since those are the actual SKUs; the app's own
+> titles are vendor-neutral.

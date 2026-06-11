@@ -74,7 +74,7 @@ export function NumberInput({ className, value, onChange, min = 0, ...props }) {
       type="number"
       min={min}
       className={cn(inputBase, className)}
-      value={value}
+      value={value ?? 0}
       onChange={(e) => {
         const v = e.target.value;
         onChange(v === '' ? 0 : Number(v));

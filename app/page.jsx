@@ -114,7 +114,7 @@ function Calculator() {
         Object.keys(priceOverrides).length > 0 ||
         Object.keys(serviceOverrides).length > 0 ||
         customLineItems.length > 0 ||
-        inputs.propertyName !== '' ||
+        JSON.stringify(inputs) !== JSON.stringify(DEFAULT_INPUTS) ||
         JSON.stringify(cameraInputs) !== JSON.stringify(DEFAULT_CAMERA_INPUTS)
       );
     }
@@ -263,7 +263,12 @@ function Calculator() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <Button size="sm" disabled={!hasChanges || busy} onClick={handleSave}>
+            <Button
+              size="sm"
+              disabled={!hasChanges || busy || (configured && !company)}
+              title={configured && !company ? 'Join a team to save projects' : undefined}
+              onClick={handleSave}
+            >
               <Save size={14} /> {currentProjectId ? 'Update Project' : 'Save Project'}
             </Button>
             <Button variant="outline" size="sm" onClick={handleExportCSV}>

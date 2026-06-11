@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Trash2, Upload, X } from 'lucide-react';
 import { Card, Button, Field, TextInput } from '@/components/ui/primitives';
 
@@ -29,6 +29,14 @@ export default function BrandingModal({ branding, onSave, onClose }) {
   const [form, setForm] = useState(() => ({ ...branding }));
   const [err, setErr] = useState(null);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
 
   const onLogo = (e) => {
     const file = e.target.files?.[0];
@@ -62,7 +70,12 @@ export default function BrandingModal({ branding, onSave, onClose }) {
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4"
       onMouseDown={onClose}
     >
-      <Card className="w-full max-w-md p-5" onMouseDown={(e) => e.stopPropagation()}>
+      <Card
+        className="w-full max-w-md p-5"
+        role="dialog"
+        aria-modal="true"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-base font-semibold text-slate-800">Branding</h2>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-700">

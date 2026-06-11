@@ -38,9 +38,18 @@ export async function POST(request) {
   if (error) return json({ error: error.message }, 400);
 
   // The on_auth_user_created trigger inserts the public.users row; set the
-  // team + role on top of it.
+  // team + role on top of it — but never pull a user out of a team they already
+  // belong to (a non-super inviter can't hijack another team's member).
   const id = data?.user?.id;
   if (id) {
+    const { data: existing } = await svc
+      .from('users')
+      .select('company_id')
+      .eq('id', id)
+      .single();
+    if (existing?.company_id && existing.company_id !== companyId && !isSuper) {
+      return json({ error: 'That email already belongs to another team.' }, 409);
+    }
     await svc
       .from('users')
       .upsert({ id, email, role, company_id: companyId }, { onConflict: 'id' });
