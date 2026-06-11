@@ -62,9 +62,11 @@ function Calculator() {
   const { projects, loadProject, saveProject, deleteProject } = useProjects(session, company, user);
 
   // Local mode (no backend) has no roles. In team mode, catalog + branding are
-  // Admin-only; the API and branding save enforce the team context (with a clear
-  // error) so we don't hide the controls when a team is mid-resolve.
-  const canManageCatalog = !configured || role === 'company_admin' || isSuperAdmin;
+  // Admin-only AND require a team to act on (a super admin with no team has no
+  // catalog to manage). The API + branding save also enforce this server-side.
+  const canManageCatalog = configured
+    ? (role === 'company_admin' || isSuperAdmin) && !!company
+    : true;
 
   const bom = useMemo(
     () =>
