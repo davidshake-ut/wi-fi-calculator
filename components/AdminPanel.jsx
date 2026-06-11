@@ -8,7 +8,7 @@ import { Card, Button, Field, TextInput, Select, Badge } from '@/components/ui/p
 
 export default function AdminPanel() {
   const supabase = getSupabase();
-  const { session, isSuperAdmin, company, user } = useSession();
+  const { session, isSuperAdmin, company, user, refresh: refreshSession } = useSession();
 
   const [companies, setCompanies] = useState([]);
   const [members, setMembers] = useState([]);
@@ -107,8 +107,11 @@ export default function AdminPanel() {
       .from('users')
       .update({ company_id: companyId || null })
       .eq('id', userId);
-    if (error) setErr(error.message);
-    else await refresh();
+    if (error) return setErr(error.message);
+    await refresh();
+    // If a super admin assigned themselves a team, re-resolve the session so the
+    // calculator picks up the new team immediately.
+    if (userId === user?.id) await refreshSession?.();
   };
 
   const memberCount = (cid) => members.filter((m) => m.company_id === cid).length;
@@ -336,7 +339,6 @@ function MembersTable({ members, companies, selfId, onRole, onRemove, onReassign
                         className="h-8 w-44"
                         value={m.company_id || ''}
                         onChange={(e) => onReassign(m.id, e.target.value)}
-                        disabled={isSuper}
                       >
                         <option value="">— none —</option>
                         {companies.map((c) => (

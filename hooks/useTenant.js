@@ -37,19 +37,20 @@ export function useTenant() {
         if (pErr) throw pErr;
         setUser(profile);
 
-        if (profile.role === 'super_admin') {
-          setCompany(null);
-        } else if (!profile.company_id) {
-          setCompany(null);
-          setError('no_team');
-        } else {
+        // Resolve the team for ANY role with a company_id (a super admin may
+        // also belong to a team to use the per-team features). A non-super user
+        // with no team is awaiting assignment.
+        if (profile.company_id) {
           const { data: comp } = await supabase
             .from('companies')
             .select('*')
             .eq('id', profile.company_id)
             .single();
           setCompany(comp || null);
-          if (!comp) setError('no_team');
+          if (!comp && profile.role !== 'super_admin') setError('no_team');
+        } else {
+          setCompany(null);
+          if (profile.role !== 'super_admin') setError('no_team');
         }
       } catch (e) {
         setError(e.message || 'resolution_failed');

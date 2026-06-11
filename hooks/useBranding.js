@@ -72,7 +72,8 @@ export function useBranding(opts = {}) {
     const branding = companyBranding(company);
     const setBranding = async (b) => {
       const supabase = getSupabase();
-      if (!supabase || !company?.id) return;
+      if (!company?.id) throw new Error('Branding is per team — join or select a team first.');
+      if (!supabase) return;
       const { error } = await supabase
         .from('companies')
         .update({

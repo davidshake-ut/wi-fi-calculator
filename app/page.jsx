@@ -62,8 +62,11 @@ function Calculator() {
   const { projects, loadProject, saveProject, deleteProject } = useProjects(session, company, user);
 
   // Local mode (no backend) has no roles — the local user manages their own
-  // catalog. Otherwise it's gated to company_admin / super_admin.
-  const canManageCatalog = !configured || role === 'company_admin' || isSuperAdmin;
+  // catalog. In team mode, catalog + branding require Admin rights AND a team
+  // to act on (a super admin with no team has nothing to edit).
+  const canManageCatalog = configured
+    ? (role === 'company_admin' || isSuperAdmin) && !!company
+    : true;
 
   const bom = useMemo(
     () =>
