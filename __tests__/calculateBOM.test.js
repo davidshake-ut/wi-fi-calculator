@@ -215,3 +215,23 @@ describe('custom line items', () => {
     expect(withCustom.grandTotalPrice).toBeGreaterThan(base.grandTotalPrice);
   });
 });
+
+describe('camera-only quote (includeWifi = false)', () => {
+  it('zeroes Wi-Fi equipment and services', () => {
+    const bom = calculateBOM({ ...DEFAULT_INPUTS, includeWifi: false }, {}, {}, BASE_PRODUCTS);
+    expect(bom.items).toEqual([]);
+    expect(bom.serviceItems).toEqual([]);
+    expect(bom.totalAPs).toBe(0);
+    expect(bom.totalHardwarePrice).toBe(0);
+    expect(bom.grandTotalPrice).toBe(0);
+  });
+
+  it('still keeps custom Wi-Fi lines the user added', () => {
+    const bom = calculateBOM({ ...DEFAULT_INPUTS, includeWifi: false }, {}, {}, BASE_PRODUCTS, [
+      { id: 'c1', segment: 'Accessories', sku: 'X', description: 'Misc', qty: 1, cost: 10, price: 20 },
+    ]);
+    expect(bom.items).toHaveLength(1);
+    expect(bom.items[0].isCustomLine).toBe(true);
+    expect(bom.totalHardwarePrice).toBe(20);
+  });
+});

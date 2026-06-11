@@ -188,16 +188,21 @@ function Calculator() {
   };
 
   const hasCameras = cameraBom.totalCameras > 0;
+  const hasWifi = bom.items.length > 0;
+  const systemsTitle =
+    hasWifi && hasCameras
+      ? 'Wi-Fi & Camera Systems'
+      : hasCameras
+        ? 'Camera Systems'
+        : 'Managed Wi-Fi';
 
   const handleExportCSV = () =>
     exportCSV(inputs, exportSections(), { fileSuffix: 'Quote', companyName: branding.companyName });
 
   const handleExportPDF = () =>
     exportPDF(inputs, exportSections(), {
-      title: hasCameras
-        ? 'Wi-Fi & Camera Systems — Budgetary Quote'
-        : 'Managed Wi-Fi — Budgetary Quote',
-      footerLabel: hasCameras ? 'Managed Systems' : 'Managed Wi-Fi',
+      title: `${systemsTitle} — Budgetary Quote`,
+      footerLabel: systemsTitle,
       fileSuffix: 'Quote',
       branding,
     });
