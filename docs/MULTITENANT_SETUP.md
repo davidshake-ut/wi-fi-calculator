@@ -39,11 +39,17 @@ In the Supabase dashboard → **SQL Editor**, run each file in
 
 ## 3. Get your keys
 
-Supabase dashboard → **Project Settings → API**:
+Supabase recently split API keys into a new **Publishable / Secret** system and
+the original **Legacy** keys. **Use the Legacy keys** — this app is built around
+them and the invite flow needs the `service_role` key. (You can migrate to the
+new keys later.)
 
-- **Project URL** → `NEXT_PUBLIC_SUPABASE_URL`
-- **anon / public key** → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- **service_role key** (keep secret!) → `SUPABASE_SERVICE_ROLE_KEY`
+- **Project URL** — Project Settings → **Data API** → copy **Project URL**
+  (`https://<ref>.supabase.co`) → `NEXT_PUBLIC_SUPABASE_URL`
+- Project Settings → **API Keys** → open the **Legacy `anon`, `service_role`**
+  section:
+  - **anon / public** → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+  - **service_role / secret** (keep secret!) → `SUPABASE_SERVICE_ROLE_KEY`
 
 Add all three in **Vercel → your project → Settings → Environment Variables**
 (Production + Preview), then **redeploy**. For local dev, put the same three in
