@@ -65,8 +65,13 @@ Supabase dashboard → **Authentication**:
 1. **Providers → Email**: enable it. This covers both sign-in methods we use —
    **email + password** and **email login code** (one-time code / magic link).
 2. **Providers → Email → "Confirm email"**: on for production.
-3. **Sign-ups**: turn **OFF** "Allow new users to sign up". Membership is
-   invite-only — only people you or a team Admin invite can get in.
+3. **Sign-ups**: **leave ON** "Allow new users to sign up". Counter-intuitive,
+   but turning it OFF blocks invited users from logging in with an email code
+   (Supabase treats their first code as a signup → "Signups not allowed for this
+   instance"). It stays effectively invite-only anyway: the app has no sign-up
+   screen (sign-in only), and anyone who isn't invited has no team, so they hit a
+   "you're not on a team" wall with zero data access (enforced by row-level
+   security). Membership is controlled entirely by invitations.
 4. **URL Configuration** (Authentication → URL Configuration) — **required**, or
    invite/login links fail with `{"error":"requested path is invalid"}`:
    - **Site URL**: your app URL, e.g. `https://wi-fi-calculator.vercel.app`
