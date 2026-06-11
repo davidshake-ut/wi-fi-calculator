@@ -21,15 +21,17 @@ function initialForm(product) {
 
 // The modal is mounted only while open (see page.jsx), so initializing form
 // state from `product` here resets it correctly each time it opens — no effect.
-export default function ProductModal({ open, product, onClose, onSave }) {
+export default function ProductModal({ open, product, clone = false, onClose, onSave }) {
   const [form, setForm] = useState(() => initialForm(product));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
 
   if (!open) return null;
 
-  const isEdit = Boolean(product);
+  // Clone pre-fills from a product but saves as a NEW product (editable SKU).
+  const isEdit = Boolean(product) && !clone;
   const skuLocked = isEdit && !product.isCustom; // base products keep their SKU
+  const title = clone ? 'Clone Product' : isEdit ? 'Edit Product' : 'Add Product';
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   const submit = async (e) => {
@@ -50,9 +52,7 @@ export default function ProductModal({ open, product, onClose, onSave }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
       <Card className="w-full max-w-md p-5">
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-slate-800">
-            {isEdit ? 'Edit Product' : 'Add Product'}
-          </h3>
+          <h3 className="text-sm font-semibold text-slate-800">{title}</h3>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-700">
             <X size={18} />
           </button>

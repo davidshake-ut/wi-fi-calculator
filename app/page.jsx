@@ -61,12 +61,10 @@ function Calculator() {
   const { allProducts, addProduct, editProduct, deleteProduct, importProducts } = useProducts(session);
   const { projects, loadProject, saveProject, deleteProject } = useProjects(session, company, user);
 
-  // Local mode (no backend) has no roles — the local user manages their own
-  // catalog. In team mode, catalog + branding require Admin rights AND a team
-  // to act on (a super admin with no team has nothing to edit).
-  const canManageCatalog = configured
-    ? (role === 'company_admin' || isSuperAdmin) && !!company
-    : true;
+  // Local mode (no backend) has no roles. In team mode, catalog + branding are
+  // Admin-only; the API and branding save enforce the team context (with a clear
+  // error) so we don't hide the controls when a team is mid-resolve.
+  const canManageCatalog = !configured || role === 'company_admin' || isSuperAdmin;
 
   const bom = useMemo(
     () =>
@@ -214,7 +212,7 @@ function Calculator() {
     exportProposalPDF({ inputs, cameraInputs, term, sections: exportSections(), branding });
 
   const saveCatalog = async (form) => {
-    if (modal.product) await editProduct(form);
+    if (modal.product && !modal.clone) await editProduct(form);
     else await addProduct(form);
   };
 
@@ -415,6 +413,9 @@ function Calculator() {
               canManageCatalog={canManageCatalog}
               onAdd={() => setModal({ open: true, product: null })}
               onEdit={(p) => setModal({ open: true, product: p })}
+              onClone={(p) =>
+                setModal({ open: true, product: { ...p, sku: `${p.sku}-COPY` }, clone: true })
+              }
               onDelete={removeCatalog}
               onImport={importProducts}
             />
@@ -426,6 +427,7 @@ function Calculator() {
         <ProductModal
           open={modal.open}
           product={modal.product}
+          clone={modal.clone}
           onClose={() => setModal({ open: false, product: null })}
           onSave={saveCatalog}
         />

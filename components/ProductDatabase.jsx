@@ -5,6 +5,7 @@ import {
   ChevronDown,
   ChevronUp,
   ChevronsUpDown,
+  Copy,
   Download,
   Pencil,
   Search,
@@ -21,6 +22,7 @@ export default function ProductDatabase({
   allProducts,
   onAdd,
   onEdit,
+  onClone,
   onDelete,
   onImport,
   canManageCatalog = false,
@@ -218,6 +220,13 @@ export default function ProductDatabase({
                           className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-blue-50 hover:text-blue-600"
                         >
                           <Pencil size={15} />
+                        </button>
+                        <button
+                          title="Clone product (create a copy)"
+                          onClick={() => onClone?.(p)}
+                          className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                        >
+                          <Copy size={15} />
                         </button>
                         <button
                           title={
