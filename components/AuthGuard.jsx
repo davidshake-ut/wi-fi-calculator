@@ -22,6 +22,7 @@ function LoginScreen() {
   const [password, setPassword] = useState('');
   const [code, setCode] = useState('');
   const [codeSent, setCodeSent] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
   const [err, setErr] = useState(null);
   const [busy, setBusy] = useState(false);
 
@@ -29,6 +30,7 @@ function LoginScreen() {
     setMode(next);
     setErr(null);
     setCodeSent(false);
+    setResetSent(false);
     setCode('');
   };
 
@@ -68,6 +70,18 @@ function LoginScreen() {
     // success → onAuthStateChange updates the session
   };
 
+  const sendReset = async (e) => {
+    e.preventDefault();
+    setBusy(true);
+    setErr(null);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: typeof window !== 'undefined' ? `${window.location.origin}/welcome` : undefined,
+    });
+    setBusy(false);
+    if (error) setErr(error.message);
+    else setResetSent(true);
+  };
+
   return (
     <Centered>
       <div className="mb-5 flex items-center gap-2">
@@ -77,7 +91,47 @@ function LoginScreen() {
         <h1 className="text-sm font-semibold text-slate-800">Managed Wi-Fi BOM Calculator</h1>
       </div>
 
-      <div className="mb-4 flex rounded-lg border border-slate-200 bg-slate-100/80 p-1 text-xs font-medium">
+      {mode === 'reset' ? (
+        resetSent ? (
+          <div className="space-y-3 text-center">
+            <p className="text-sm text-slate-600">
+              If an account exists for <strong>{email}</strong>, a link to reset your password is on
+              its way.
+            </p>
+            <Button variant="outline" className="w-full" onClick={() => reset('password')}>
+              Back to sign in
+            </Button>
+          </div>
+        ) : (
+          <form onSubmit={sendReset} className="space-y-3">
+            <p className="text-xs text-slate-500">
+              Enter your email and we&apos;ll send a link to set a new password.
+            </p>
+            <Field label="Email">
+              <TextInput
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@company.com"
+              />
+            </Field>
+            {err && <p className="text-xs text-red-600">{err}</p>}
+            <Button type="submit" className="w-full" disabled={busy}>
+              {busy ? 'Sending…' : 'Email me a reset link'}
+            </Button>
+            <button
+              type="button"
+              onClick={() => reset('password')}
+              className="w-full text-center text-xs text-slate-400 hover:text-slate-600"
+            >
+              Back to sign in
+            </button>
+          </form>
+        )
+      ) : (
+        <>
+          <div className="mb-4 flex rounded-lg border border-slate-200 bg-slate-100/80 p-1 text-xs font-medium">
         {[
           ['password', 'Password'],
           ['code', 'Email code'],
@@ -120,6 +174,13 @@ function LoginScreen() {
           <Button type="submit" className="w-full" disabled={busy}>
             {busy ? 'Signing in…' : 'Sign In'}
           </Button>
+          <button
+            type="button"
+            onClick={() => reset('reset')}
+            className="w-full text-center text-xs text-slate-400 hover:text-slate-600"
+          >
+            Forgot password?
+          </button>
         </form>
       )}
 
@@ -169,6 +230,8 @@ function LoginScreen() {
             </Button>
           </form>
         ))}
+        </>
+      )}
 
       <p className="mt-4 text-center text-xs text-slate-400">
         Access is invite-only. Ask your team admin for an invitation.

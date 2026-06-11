@@ -63,14 +63,14 @@ export default function WelcomePage() {
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 text-white shadow-sm">
             <Wifi size={18} />
           </span>
-          <h1 className="text-sm font-semibold text-slate-800">Welcome — set your password</h1>
+          <h1 className="text-sm font-semibold text-slate-800">Set your password</h1>
         </div>
 
         {!supabase ? (
           <p className="text-sm text-slate-600">Team mode isn&apos;t configured on this instance.</p>
         ) : !ready ? (
           <div className="flex items-center justify-center gap-2 py-6 text-slate-500">
-            <Loader2 className="animate-spin" size={18} /> Verifying your invitation…
+            <Loader2 className="animate-spin" size={18} /> Verifying your link…
           </div>
         ) : done ? (
           <div className="flex flex-col items-center gap-2 py-4 text-center">
@@ -80,8 +80,8 @@ export default function WelcomePage() {
         ) : !hasSession ? (
           <div className="space-y-3">
             <p className="text-sm text-slate-600">
-              This invitation link is invalid or has expired. Ask your admin to re-send it, or sign
-              in with an email login code.
+              This link is invalid or has expired. Request a new invite or password reset, or sign in
+              with an email login code.
             </p>
             <Button variant="outline" className="w-full" onClick={() => router.push('/')}>
               Go to sign in
