@@ -179,6 +179,15 @@ describe('Financial totals', () => {
       6
     );
   });
+  it('shipping toggle off → no shipping; custom percent is applied', () => {
+    const off = run({ includeShipping: false });
+    expect(off.shippingPrice).toBe(0);
+    expect(off.shippingPercent).toBe(0);
+    expect(off.grandTotalPrice).toBeCloseTo(off.totalHardwarePrice, 6);
+    const custom = run({ includeShipping: true, shippingPercent: 10 });
+    expect(custom.shippingPercent).toBe(10);
+    expect(custom.shippingPrice).toBeCloseTo(custom.totalHardwarePrice * 0.1, 6);
+  });
   it('emits hardware only — labor moved to the project rate card', () => {
     // The engine no longer generates professional services; all labor now comes
     // from lib/calculateLabor.js (see calculateLabor.test.js).

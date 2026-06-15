@@ -107,6 +107,10 @@ function Calculator() {
   const wifiEnabled = inputs.includeWifi !== false;
   const camerasEnabled = inputs.includeCameras !== false;
 
+  // Shipping is a project-level setting shared by both BOMs (Wi-Fi reads it from
+  // inputs directly; the camera engine takes it as an option).
+  const includeShipping = inputs.includeShipping !== false;
+  const shippingPercent = inputs.shippingPercent ?? 7;
   const cameraBom = useMemo(
     () =>
       calculateCameraBOM(
@@ -114,9 +118,19 @@ function Calculator() {
         priceOverrides,
         serviceOverrides,
         allProducts,
-        camerasEnabled ? customLineItems.filter((c) => c.system === 'camera') : []
+        camerasEnabled ? customLineItems.filter((c) => c.system === 'camera') : [],
+        { includeShipping, shippingPercent }
       ),
-    [camerasEnabled, cameraInputs, priceOverrides, serviceOverrides, allProducts, customLineItems]
+    [
+      camerasEnabled,
+      cameraInputs,
+      priceOverrides,
+      serviceOverrides,
+      allProducts,
+      customLineItems,
+      includeShipping,
+      shippingPercent,
+    ]
   );
   // Project-wide professional labor (the single labor source; see calculateLabor).
   const labor = useMemo(() => calculateLabor(laborRoles), [laborRoles]);
@@ -488,7 +502,9 @@ function Calculator() {
           canManageBranding={canManageCatalog}
           includeWifi={wifiEnabled}
           includeCameras={camerasEnabled}
-          onToggleTech={(key, val) => setInputs((prev) => ({ ...prev, [key]: val }))}
+          includeShipping={includeShipping}
+          shippingPercent={shippingPercent}
+          onSetInput={(key, val) => setInputs((prev) => ({ ...prev, [key]: val }))}
           onSave={async (b) => {
             try {
               await setBranding(b);

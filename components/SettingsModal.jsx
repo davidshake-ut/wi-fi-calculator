@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Trash2, Upload, X, Wifi, Camera } from 'lucide-react';
-import { Card, Button, Field, TextInput, Toggle } from '@/components/ui/primitives';
+import { Card, Button, Field, TextInput, NumberInput, Toggle } from '@/components/ui/primitives';
 
 const MAX_LOGO_BYTES = 1_000_000; // ~1 MB — localStorage-friendly
 
@@ -35,7 +35,9 @@ export default function SettingsModal({
   canManageBranding = false,
   includeWifi = true,
   includeCameras = true,
-  onToggleTech,
+  includeShipping = true,
+  shippingPercent = 7,
+  onSetInput,
 }) {
   const [form, setForm] = useState(() => ({ ...branding }));
   const [err, setErr] = useState(null);
@@ -111,7 +113,7 @@ export default function SettingsModal({
               <Wifi size={15} className="text-slate-400" />
               <Toggle
                 checked={includeWifi}
-                onChange={(v) => onToggleTech?.('includeWifi', v)}
+                onChange={(v) => onSetInput?.('includeWifi', v)}
                 label="Managed Wi-Fi"
               />
             </div>
@@ -119,7 +121,7 @@ export default function SettingsModal({
               <Camera size={15} className="text-slate-400" />
               <Toggle
                 checked={includeCameras}
-                onChange={(v) => onToggleTech?.('includeCameras', v)}
+                onChange={(v) => onSetInput?.('includeCameras', v)}
                 label="Camera Systems"
               />
             </div>
@@ -130,6 +132,32 @@ export default function SettingsModal({
               No systems selected — enable at least one to build a quote.
             </p>
           )}
+        </section>
+
+        {/* Shipping — per project, applies live */}
+        <section className="mt-5 space-y-3 border-t border-slate-100 pt-5">
+          <div>
+            <h3 className="text-sm font-semibold text-slate-700">Shipping</h3>
+            <p className="text-xs text-slate-400">
+              Add an estimated shipping line as a percentage of the hardware total.
+            </p>
+          </div>
+
+          <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
+            <Toggle
+              checked={includeShipping}
+              onChange={(v) => onSetInput?.('includeShipping', v)}
+              label="Add Shipping"
+            />
+            {includeShipping && (
+              <Field className="mt-3" label="Shipping (% of hardware)">
+                <NumberInput
+                  value={shippingPercent ?? 7}
+                  onChange={(v) => onSetInput?.('shippingPercent', v)}
+                />
+              </Field>
+            )}
+          </div>
         </section>
 
         {/* Branding — global, Admin-only */}

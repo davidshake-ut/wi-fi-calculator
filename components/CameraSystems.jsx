@@ -56,12 +56,16 @@ export default function CameraSystems({
                     {currency(cameraBom.totalHardwarePrice)}
                   </td>
                 </tr>
-                <tr className="border-b border-slate-50">
-                  <td className="px-4 py-2.5 text-slate-700">Estimated Shipping (7%)</td>
-                  <td className="px-4 py-2.5 text-right tabular-nums text-slate-700">
-                    {currency(cameraBom.shippingPrice)}
-                  </td>
-                </tr>
+                {cameraBom.shippingPrice > 0 && (
+                  <tr className="border-b border-slate-50">
+                    <td className="px-4 py-2.5 text-slate-700">
+                      Estimated Shipping ({cameraBom.shippingPercent ?? 7}%)
+                    </td>
+                    <td className="px-4 py-2.5 text-right tabular-nums text-slate-700">
+                      {currency(cameraBom.shippingPrice)}
+                    </td>
+                  </tr>
+                )}
               </tbody>
               <tfoot>
                 <tr className="border-t-2 border-slate-200 text-base font-bold">

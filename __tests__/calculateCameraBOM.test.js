@@ -9,6 +9,42 @@ const run = (overrides = {}, products = BASE_PRODUCTS) =>
 const qtyOf = (bom, sku) =>
   bom.items.filter((i) => i.sku === sku).reduce((s, i) => s + i.qty, 0);
 
+describe('camera BOM — AI camera licenses', () => {
+  it('adds the Alpha Vision license line at the entered quantity (any number)', () => {
+    const bom = run({ cam4mpTurret: 8, aiLicenses: 3 }); // license count != camera count
+    expect(qtyOf(bom, 'AV-AI-LIC')).toBe(3);
+    const lic = bom.items.find((i) => i.sku === 'AV-AI-LIC');
+    expect(lic.unitCost).toBe(99);
+    expect(lic.unitPrice).toBe(149);
+  });
+  it('no licenses → no license line', () => {
+    expect(qtyOf(run({ cam4mpTurret: 8 }), 'AV-AI-LIC')).toBe(0);
+  });
+  it('licenses can be added with zero cameras', () => {
+    const bom = run({ aiLicenses: 2 });
+    expect(qtyOf(bom, 'AV-AI-LIC')).toBe(2);
+  });
+});
+
+describe('camera BOM — configurable shipping', () => {
+  const opts = (o) =>
+    calculateCameraBOM({ ...DEFAULT_CAMERA_INPUTS, cam4mpBullet: 1 }, {}, {}, BASE_PRODUCTS, [], o);
+  it('defaults to 7% when no option is passed', () => {
+    expect(run({ cam4mpBullet: 1 }).shippingPercent).toBe(7);
+  });
+  it('toggled off → no shipping', () => {
+    const bom = opts({ includeShipping: false });
+    expect(bom.shippingPrice).toBe(0);
+    expect(bom.shippingPercent).toBe(0);
+    expect(bom.grandTotalPrice).toBeCloseTo(bom.totalHardwarePrice, 2);
+  });
+  it('custom percent is applied to hardware', () => {
+    const bom = opts({ includeShipping: true, shippingPercent: 12 });
+    expect(bom.shippingPercent).toBe(12);
+    expect(bom.shippingPrice).toBeCloseTo(bom.totalHardwarePrice * 0.12, 6);
+  });
+});
+
 describe('camera BOM — empty', () => {
   const bom = run();
   it('no cameras → no items, zero totals', () => {

@@ -36,6 +36,15 @@ export default function CameraInputPanel({ cameraInputs, setCameraInputs }) {
         </Field>
       </Section>
 
+      <Section title="Licensing">
+        <Field
+          label="AI Camera Licenses"
+          sub="Alpha Vision AI analytics — enter any quantity (need not match the camera count)"
+        >
+          <NumberInput value={cameraInputs.aiLicenses ?? 0} onChange={(v) => set('aiLicenses', v)} />
+        </Field>
+      </Section>
+
       <Section title="Recording">
         <Field
           label="Retention"

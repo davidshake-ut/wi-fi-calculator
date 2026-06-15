@@ -81,7 +81,9 @@ export default function CostSummary({ sections = [], scope = [] }) {
 
               {bom.shippingPrice > 0 && (
                 <tr className="border-b border-slate-50">
-                  <td className="px-4 py-2.5 text-slate-700">Estimated Shipping (7%)</td>
+                  <td className="px-4 py-2.5 text-slate-700">
+                    Estimated Shipping ({bom.shippingPercent ?? 7}%)
+                  </td>
                   <td className="px-4 py-2.5 text-right tabular-nums text-slate-500">
                     {currency(bom.shippingCost)}
                   </td>
