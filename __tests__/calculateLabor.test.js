@@ -39,6 +39,28 @@ describe('calculateLabor', () => {
     expect(labor.serviceItems.map((s) => s.sku)).toEqual(['a']);
   });
 
+  it('null hours use the estimate; a number overrides it', () => {
+    const roles = [
+      { key: 'a', label: 'Tech', costRate: 75, billRate: 125, hours: null }, // estimate
+      { key: 'b', label: 'PM', costRate: 100, billRate: 160, hours: 5 }, // override
+    ];
+    const labor = calculateLabor(roles, { a: 30, b: 99 });
+    const tech = labor.serviceItems.find((s) => s.sku === 'a');
+    const pm = labor.serviceItems.find((s) => s.sku === 'b');
+    expect(tech.qty).toBe(30); // from the estimate
+    expect(tech.note).toMatch(/\(est\.\)/);
+    expect(pm.qty).toBe(5); // override wins over the estimate of 99
+    expect(pm.note).not.toMatch(/\(est\.\)/);
+  });
+
+  it('a role with no estimate and no override contributes nothing', () => {
+    const labor = calculateLabor(
+      [{ key: 'a', label: 'Tech', costRate: 75, billRate: 125, hours: null }],
+      {} // no estimate for 'a'
+    );
+    expect(labor.serviceItems).toEqual([]);
+  });
+
   it('per-line margin is computed', () => {
     const labor = calculateLabor([
       { key: 'a', label: 'Tech', costRate: 100, billRate: 200, hours: 1 },

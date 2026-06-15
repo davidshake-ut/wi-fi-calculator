@@ -22,6 +22,7 @@ import { Button } from '@/components/ui/primitives';
 import { calculateBOM } from '@/lib/calculateBOM';
 import { calculateCameraBOM } from '@/lib/calculateCameraBOM';
 import { calculateLabor } from '@/lib/calculateLabor';
+import { estimateLaborHours } from '@/lib/estimateLaborHours';
 import { useProducts } from '@/hooks/useProducts';
 import { useProjects } from '@/hooks/useProjects';
 import { DEFAULT_INPUTS, DEFAULT_CAMERA_INPUTS, DEFAULT_LABOR_ROLES } from '@/lib/defaults';
@@ -133,7 +134,15 @@ function Calculator() {
     ]
   );
   // Project-wide professional labor (the single labor source; see calculateLabor).
-  const labor = useMemo(() => calculateLabor(laborRoles), [laborRoles]);
+  // Hours are estimated live from the Wi-Fi + camera design; per-role overrides win.
+  const estimatedHours = useMemo(
+    () => estimateLaborHours({ wifiBom: bom, cameraBom, inputs, cameraInputs }),
+    [bom, cameraBom, inputs, cameraInputs]
+  );
+  const labor = useMemo(
+    () => calculateLabor(laborRoles, estimatedHours),
+    [laborRoles, estimatedHours]
+  );
 
   const newCustomId = () =>
     typeof crypto !== 'undefined' && crypto.randomUUID
@@ -441,7 +450,12 @@ function Calculator() {
                   {showMargin ? 'Hide Cost & Margin' : 'Show Cost & Margin'}
                 </Button>
               </div>
-              <LaborTable roles={laborRoles} setRoles={setLaborRoles} showMargin={showMargin} />
+              <LaborTable
+                roles={laborRoles}
+                setRoles={setLaborRoles}
+                showMargin={showMargin}
+                estimatedHours={estimatedHours}
+              />
               <p className="px-1 text-xs italic text-slate-400">
                 Set hours and rates per worker level — this drives all professional labor on the
                 Wi-Fi, camera, and combined quotes.
