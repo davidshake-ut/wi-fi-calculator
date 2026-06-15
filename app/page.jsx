@@ -13,7 +13,7 @@ import { useBranding } from '@/hooks/useBranding';
 import { readableTextHex } from '@/lib/colors';
 import SummaryCards from '@/components/SummaryCards';
 import BOMTable from '@/components/BOMTable';
-import ServicesTable from '@/components/ServicesTable';
+import LaborTable from '@/components/LaborTable';
 import CostSummary from '@/components/CostSummary';
 import CameraSystems from '@/components/CameraSystems';
 import ProductDatabase from '@/components/ProductDatabase';
@@ -21,9 +21,10 @@ import ProductModal from '@/components/ProductModal';
 import { Button } from '@/components/ui/primitives';
 import { calculateBOM } from '@/lib/calculateBOM';
 import { calculateCameraBOM } from '@/lib/calculateCameraBOM';
+import { calculateLabor } from '@/lib/calculateLabor';
 import { useProducts } from '@/hooks/useProducts';
 import { useProjects } from '@/hooks/useProjects';
-import { DEFAULT_INPUTS, DEFAULT_CAMERA_INPUTS } from '@/lib/defaults';
+import { DEFAULT_INPUTS, DEFAULT_CAMERA_INPUTS, DEFAULT_LABOR_ROLES } from '@/lib/defaults';
 import { getTerminology } from '@/lib/terminology';
 import { exportPDF, wifiKpis, cameraKpis } from '@/lib/exportPDF';
 import { exportProposalPDF } from '@/lib/exportProposal';
@@ -48,10 +49,10 @@ function Calculator() {
   const [priceOverrides, setPriceOverrides] = useState({});
   const [serviceOverrides, setServiceOverrides] = useState({});
   const [customLineItems, setCustomLineItems] = useState([]);
+  const [laborRoles, setLaborRoles] = useState(DEFAULT_LABOR_ROLES);
   const [activeTab, setActiveTab] = useState('hardware');
   const [showMargin, setShowMargin] = useState(false);
   const [editPrices, setEditPrices] = useState(false);
-  const [editServices, setEditServices] = useState(false);
   const [currentProjectId, setCurrentProjectId] = useState(null);
   const [savedSnapshot, setSavedSnapshot] = useState(null);
   const [modal, setModal] = useState({ open: false, product: null });
@@ -112,6 +113,8 @@ function Calculator() {
       ),
     [cameraInputs, priceOverrides, serviceOverrides, allProducts, customLineItems]
   );
+  // Project-wide professional labor (the single labor source; see calculateLabor).
+  const labor = useMemo(() => calculateLabor(laborRoles), [laborRoles]);
 
   const newCustomId = () =>
     typeof crypto !== 'undefined' && crypto.randomUUID
@@ -129,6 +132,9 @@ function Calculator() {
   const term = getTerminology(inputs.propertyType);
 
   const onCameras = activeTab === 'cameras';
+  // Tab-dependent dashboard strip: Wi-Fi tab → Wi-Fi, Camera tab → cameras,
+  // everything else (Services / Summary / Products) → combined.
+  const dashView = activeTab === 'hardware' ? 'wifi' : onCameras ? 'cameras' : 'both';
 
   const hasChanges = useMemo(() => {
     if (!savedSnapshot) {
@@ -137,7 +143,8 @@ function Calculator() {
         Object.keys(serviceOverrides).length > 0 ||
         customLineItems.length > 0 ||
         JSON.stringify(inputs) !== JSON.stringify(DEFAULT_INPUTS) ||
-        JSON.stringify(cameraInputs) !== JSON.stringify(DEFAULT_CAMERA_INPUTS)
+        JSON.stringify(cameraInputs) !== JSON.stringify(DEFAULT_CAMERA_INPUTS) ||
+        JSON.stringify(laborRoles) !== JSON.stringify(DEFAULT_LABOR_ROLES)
       );
     }
     return (
@@ -145,9 +152,10 @@ function Calculator() {
       JSON.stringify(cameraInputs) !== JSON.stringify(savedSnapshot.cameraInputs) ||
       JSON.stringify(priceOverrides) !== JSON.stringify(savedSnapshot.priceOverrides) ||
       JSON.stringify(serviceOverrides) !== JSON.stringify(savedSnapshot.serviceOverrides) ||
-      JSON.stringify(customLineItems) !== JSON.stringify(savedSnapshot.customLineItems)
+      JSON.stringify(customLineItems) !== JSON.stringify(savedSnapshot.customLineItems) ||
+      JSON.stringify(laborRoles) !== JSON.stringify(savedSnapshot.laborRoles ?? DEFAULT_LABOR_ROLES)
     );
-  }, [inputs, cameraInputs, priceOverrides, serviceOverrides, customLineItems, savedSnapshot]);
+  }, [inputs, cameraInputs, priceOverrides, serviceOverrides, customLineItems, laborRoles, savedSnapshot]);
 
   const selectProject = (id) => {
     if (!id) {
@@ -156,6 +164,7 @@ function Calculator() {
       setPriceOverrides({});
       setServiceOverrides({});
       setCustomLineItems([]);
+      setLaborRoles(DEFAULT_LABOR_ROLES);
       setCurrentProjectId(null);
       setSavedSnapshot(null);
       return;
@@ -168,6 +177,7 @@ function Calculator() {
     setPriceOverrides(loaded.priceOverrides);
     setServiceOverrides(loaded.serviceOverrides);
     setCustomLineItems(loaded.customLineItems);
+    setLaborRoles(loaded.laborRoles);
     setCurrentProjectId(project.id);
     setSavedSnapshot(loaded);
   };
@@ -187,9 +197,17 @@ function Calculator() {
         priceOverrides,
         serviceOverrides,
         customLineItems,
+        laborRoles,
       });
       setCurrentProjectId(saved.id);
-      setSavedSnapshot({ inputs, cameraInputs, priceOverrides, serviceOverrides, customLineItems });
+      setSavedSnapshot({
+        inputs,
+        cameraInputs,
+        priceOverrides,
+        serviceOverrides,
+        customLineItems,
+        laborRoles,
+      });
     } catch (e) {
       alert(`Save failed: ${e.message}`);
     } finally {
@@ -208,6 +226,10 @@ function Calculator() {
         bom: cameraBom,
         kpis: cameraKpis(cameraBom),
       });
+    }
+    // Professional labor is a project-wide section (its own labor lines + total).
+    if (labor.serviceItems.length > 0) {
+      list.push({ title: 'Professional Labor', label: 'Labor', isLabor: true, bom: labor });
     }
     return list;
   };
@@ -362,7 +384,13 @@ function Calculator() {
             ))}
           </div>
 
-          {!onCameras && <SummaryCards bom={bom} term={term} />}
+          <SummaryCards
+            view={dashView}
+            bom={bom}
+            cameraBom={cameraBom}
+            labor={labor}
+            term={term}
+          />
 
           {activeTab === 'hardware' && (
             <BOMTable
@@ -384,36 +412,12 @@ function Calculator() {
                 <Button variant="outline" size="sm" onClick={() => setShowMargin((s) => !s)}>
                   {showMargin ? 'Hide Cost & Margin' : 'Show Cost & Margin'}
                 </Button>
-                <Button
-                  variant={editServices ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setEditServices((e) => !e)}
-                >
-                  {editServices ? 'Done Editing' : 'Edit Values'}
-                </Button>
               </div>
-              <ServicesTable
-                bom={bom}
-                title="Wi-Fi Professional Services"
-                serviceOverrides={serviceOverrides}
-                setServiceOverrides={setServiceOverrides}
-                showMargin={showMargin}
-                editServices={editServices}
-              />
-              {cameraBom.serviceItems.length > 0 ? (
-                <ServicesTable
-                  bom={cameraBom}
-                  title="Camera Professional Services"
-                  serviceOverrides={serviceOverrides}
-                  setServiceOverrides={setServiceOverrides}
-                  showMargin={showMargin}
-                  editServices={editServices}
-                />
-              ) : (
-                <p className="px-1 text-xs italic text-slate-400">
-                  Add cameras on the Camera Systems tab to generate camera labor here.
-                </p>
-              )}
+              <LaborTable roles={laborRoles} setRoles={setLaborRoles} showMargin={showMargin} />
+              <p className="px-1 text-xs italic text-slate-400">
+                Set hours and rates per worker level — this drives all professional labor on the
+                Wi-Fi, camera, and combined quotes.
+              </p>
             </div>
           )}
           {activeTab === 'summary' && (

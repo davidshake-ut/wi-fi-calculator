@@ -274,3 +274,14 @@ create policy custom_products_write on public.custom_products
 -- saved_projects already isolate by company_id (see 0001) — shared across the
 -- team, invisible to other teams. No change needed.
 
+
+-- ======================================================================
+-- supabase/migrations/0005_labor_roles.sql
+-- ======================================================================
+-- Per-project professional-labor rate card (worker levels with cost rate, bill
+-- rate, and hours). Drives all labor on the quote; replaces the old hardcoded
+-- auto-generated services. Local mode persists the same field in localStorage.
+
+alter table public.saved_projects
+  add column if not exists labor_roles jsonb not null default '[]';
+

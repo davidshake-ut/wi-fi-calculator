@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { getSupabase } from '@/lib/supabase/client';
-import { DEFAULT_INPUTS, DEFAULT_CAMERA_INPUTS } from '@/lib/defaults';
+import { DEFAULT_INPUTS, DEFAULT_CAMERA_INPUTS, DEFAULT_LABOR_ROLES } from '@/lib/defaults';
 
 // In local mode (no Supabase) projects are persisted to localStorage so the
 // user can still save and reopen projects. Rows use the same column shape as
@@ -101,11 +101,24 @@ export function useProjects(session, company, user) {
       priceOverrides: project.price_overrides || {},
       serviceOverrides: project.service_overrides || {},
       customLineItems: project.custom_line_items || [],
+      laborRoles:
+        Array.isArray(project.labor_roles) && project.labor_roles.length
+          ? project.labor_roles
+          : DEFAULT_LABOR_ROLES,
     };
   }, []);
 
   const saveProject = useCallback(
-    async ({ id, projectName, inputs, cameraInputs, priceOverrides, serviceOverrides, customLineItems }) => {
+    async ({
+      id,
+      projectName,
+      inputs,
+      cameraInputs,
+      priceOverrides,
+      serviceOverrides,
+      customLineItems,
+      laborRoles,
+    }) => {
       if (!supabase) {
         const now = new Date().toISOString();
         const list = readLocalArray();
@@ -121,6 +134,7 @@ export function useProjects(session, company, user) {
             price_overrides: priceOverrides,
             service_overrides: serviceOverrides,
             custom_line_items: customLineItems,
+            labor_roles: laborRoles,
             updated_at: now,
           };
           if (idx >= 0) list[idx] = saved;
@@ -134,6 +148,7 @@ export function useProjects(session, company, user) {
             price_overrides: priceOverrides,
             service_overrides: serviceOverrides,
             custom_line_items: customLineItems,
+            labor_roles: laborRoles,
             created_at: now,
             updated_at: now,
           };
@@ -150,6 +165,7 @@ export function useProjects(session, company, user) {
         price_overrides: priceOverrides,
         service_overrides: serviceOverrides,
         custom_line_items: customLineItems,
+        labor_roles: laborRoles,
         company_id: company?.id ?? null,
         updated_at: new Date().toISOString(),
       };

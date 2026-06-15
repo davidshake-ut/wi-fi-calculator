@@ -11,7 +11,6 @@ const qtyOf = (bom, sku) =>
   bom.items.filter((i) => i.sku === sku).reduce((s, i) => s + i.qty, 0);
 
 const hasItem = (bom, sku) => bom.items.some((i) => i.sku === sku);
-const hasService = (bom, sku) => bom.serviceItems.some((i) => i.sku === sku);
 
 const switchQty = (bom) =>
   bom.items
@@ -158,15 +157,13 @@ describe('Building-to-building', () => {
 });
 
 describe('Structured cabling', () => {
-  it('cat6Required false → no drops and no fiber-cabling service', () => {
+  it('cat6Required false → no drops', () => {
     const bom = run({ cat6Required: false });
     expect(hasItem(bom, 'CAT6-DROP')).toBe(false);
-    expect(hasService(bom, 'FIBER-CABLING')).toBe(false);
   });
-  it('cat6Required + drops → drops and fiber-cabling service', () => {
+  it('cat6Required + drops → CAT6 drop lines', () => {
     const bom = run({ cat6Required: true, cat6Drops: 20 });
     expect(qtyOf(bom, 'CAT6-DROP')).toBe(20);
-    expect(hasService(bom, 'FIBER-CABLING')).toBe(true);
   });
 });
 
@@ -182,11 +179,12 @@ describe('Financial totals', () => {
       6
     );
   });
-  it('always includes the standard services', () => {
-    expect(hasService(bom, 'PROJ-MGMT')).toBe(true);
-    expect(hasService(bom, 'INSTALL')).toBe(true);
-    expect(hasService(bom, 'TRAVEL')).toBe(true);
-    expect(hasService(bom, 'WIRELESS-TEST')).toBe(true);
+  it('emits hardware only — labor moved to the project rate card', () => {
+    // The engine no longer generates professional services; all labor now comes
+    // from lib/calculateLabor.js (see calculateLabor.test.js).
+    expect(bom.serviceItems).toEqual([]);
+    expect(bom.totalServicesPrice).toBe(0);
+    expect(bom.grandTotalPrice).toBeCloseTo(bom.totalHardwarePrice + bom.shippingPrice, 6);
   });
 });
 

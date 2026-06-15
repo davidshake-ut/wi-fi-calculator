@@ -55,17 +55,14 @@ describe('camera BOM — storage by retention (1 HDD per NVR)', () => {
 });
 
 describe('camera BOM — pricing', () => {
-  it('uses dealer cost / MSRP price, 7% hardware shipping, grand total = hw + labor + shipping', () => {
+  it('uses dealer cost / MSRP price, 7% hardware shipping, grand total = hw + shipping', () => {
     const bom = run({ cam4mpBullet: 1 }); // 1 cam + 1 NVR + 1 8TB HDD
     // hardware price = 299 (cam) + 469 (NVR) + 279 (8TB) = 1047
     expect(bom.totalHardwarePrice).toBeCloseTo(1047, 2);
     expect(bom.totalHardwareCost).toBeCloseTo(545, 2); // 119 + 190 + 236
     expect(bom.shippingPrice).toBeCloseTo(1047 * 0.07, 2); // shipping is on hardware only
-    expect(bom.totalServicesPrice).toBeGreaterThan(0);
-    expect(bom.grandTotalPrice).toBeCloseTo(
-      bom.totalHardwarePrice + bom.totalServicesPrice + bom.shippingPrice,
-      2
-    );
+    expect(bom.totalServicesPrice).toBe(0); // labor moved to the project rate card
+    expect(bom.grandTotalPrice).toBeCloseTo(bom.totalHardwarePrice + bom.shippingPrice, 2);
     expect(bom.overallMargin).toBeGreaterThan(0);
   });
 
@@ -82,30 +79,16 @@ describe('camera BOM — pricing', () => {
   });
 });
 
-describe('camera BOM — labor (separate from Wi-Fi)', () => {
+describe('camera BOM — hardware only (labor moved to the project rate card)', () => {
   it('no cameras → no labor lines', () => {
     expect(run().serviceItems.length).toBe(0);
   });
 
-  it('cameras → install / config / test labor', () => {
+  it('cameras → still no labor lines from the engine', () => {
     const bom = run({ cam4mpTurret: 8 });
-    const skus = bom.serviceItems.map((s) => s.sku);
-    expect(skus).toContain('CAM-INSTALL');
-    expect(skus).toContain('CAM-CONFIG');
-    expect(skus).toContain('CAM-TEST');
-    expect(bom.totalServicesPrice).toBeGreaterThan(0);
-  });
-
-  it('honors service overrides', () => {
-    const bom = calculateCameraBOM(
-      { ...DEFAULT_CAMERA_INPUTS, cam4mpTurret: 8 },
-      {},
-      { 'CAM-INSTALL': { cost: 10, price: 20 } },
-      BASE_PRODUCTS
-    );
-    const install = bom.serviceItems.find((s) => s.sku === 'CAM-INSTALL');
-    expect(install.unitPrice).toBe(20);
-    expect(install.unitCost).toBe(10);
+    expect(bom.serviceItems).toEqual([]);
+    expect(bom.totalServicesPrice).toBe(0);
+    expect(bom.grandTotalPrice).toBeCloseTo(bom.totalHardwarePrice + bom.shippingPrice, 2);
   });
 });
 

@@ -18,7 +18,7 @@ function MarginBadge({ cost, price }) {
 
 // `sections` = [{ title, bom }, …]; `scope` = [{ title, text }, …]
 export default function CostSummary({ sections = [], scope = [] }) {
-  const present = sections.filter((s) => s.bom.items.length);
+  const present = sections.filter((s) => s.bom.items.length || s.bom.serviceItems?.length);
   const grandCost = present.reduce((s, x) => s + x.bom.grandTotalCost, 0);
   const grandPrice = present.reduce((s, x) => s + x.bom.grandTotalPrice, 0);
   const profit = grandPrice - grandCost;
@@ -47,22 +47,26 @@ export default function CostSummary({ sections = [], scope = [] }) {
                 </td>
               </tr>
 
-              <tr className="border-b border-slate-50">
-                <td className="px-4 py-2.5 text-slate-700">Hardware &amp; Software</td>
-                <td className="px-4 py-2.5 text-right tabular-nums text-slate-500">
-                  {currency(bom.totalHardwareCost)}
-                </td>
-                <td className="px-4 py-2.5 text-right font-medium tabular-nums text-slate-700">
-                  {currency(bom.totalHardwarePrice)}
-                </td>
-                <td className="px-4 py-2.5 text-right">
-                  <MarginBadge cost={bom.totalHardwareCost} price={bom.totalHardwarePrice} />
-                </td>
-              </tr>
+              {bom.items.length > 0 && (
+                <tr className="border-b border-slate-50">
+                  <td className="px-4 py-2.5 text-slate-700">Hardware &amp; Software</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums text-slate-500">
+                    {currency(bom.totalHardwareCost)}
+                  </td>
+                  <td className="px-4 py-2.5 text-right font-medium tabular-nums text-slate-700">
+                    {currency(bom.totalHardwarePrice)}
+                  </td>
+                  <td className="px-4 py-2.5 text-right">
+                    <MarginBadge cost={bom.totalHardwareCost} price={bom.totalHardwarePrice} />
+                  </td>
+                </tr>
+              )}
 
               {bom.totalServicesPrice > 0 && (
                 <tr className="border-b border-slate-50">
-                  <td className="px-4 py-2.5 text-slate-700">Professional Services</td>
+                  <td className="px-4 py-2.5 text-slate-700">
+                    {bom.items.length ? 'Professional Services' : 'Professional Labor'}
+                  </td>
                   <td className="px-4 py-2.5 text-right tabular-nums text-slate-500">
                     {currency(bom.totalServicesCost)}
                   </td>
@@ -75,18 +79,20 @@ export default function CostSummary({ sections = [], scope = [] }) {
                 </tr>
               )}
 
-              <tr className="border-b border-slate-50">
-                <td className="px-4 py-2.5 text-slate-700">Estimated Shipping (7%)</td>
-                <td className="px-4 py-2.5 text-right tabular-nums text-slate-500">
-                  {currency(bom.shippingCost)}
-                </td>
-                <td className="px-4 py-2.5 text-right font-medium tabular-nums text-slate-700">
-                  {currency(bom.shippingPrice)}
-                </td>
-                <td className="px-4 py-2.5 text-right">
-                  <MarginBadge cost={bom.shippingCost} price={bom.shippingPrice} />
-                </td>
-              </tr>
+              {bom.shippingPrice > 0 && (
+                <tr className="border-b border-slate-50">
+                  <td className="px-4 py-2.5 text-slate-700">Estimated Shipping (7%)</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums text-slate-500">
+                    {currency(bom.shippingCost)}
+                  </td>
+                  <td className="px-4 py-2.5 text-right font-medium tabular-nums text-slate-700">
+                    {currency(bom.shippingPrice)}
+                  </td>
+                  <td className="px-4 py-2.5 text-right">
+                    <MarginBadge cost={bom.shippingCost} price={bom.shippingPrice} />
+                  </td>
+                </tr>
+              )}
 
               <tr className="border-t border-slate-200 font-semibold">
                 <td className="px-4 py-2.5 text-slate-800">{title} Subtotal</td>
