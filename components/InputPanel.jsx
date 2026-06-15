@@ -164,16 +164,6 @@ export default function InputPanel({
       </Section>
 
       <Section title="Network Design">
-        <Toggle
-          checked={inputs.includeWifi !== false}
-          onChange={(v) => set('includeWifi', v)}
-          label="Include Wi-Fi System"
-        />
-        {inputs.includeWifi === false && (
-          <p className="rounded-md bg-amber-50 px-2 py-1 text-[11px] text-amber-700">
-            Camera-only quote — Wi-Fi equipment &amp; services are zeroed.
-          </p>
-        )}
         <Field label="Wi-Fi Generation">
           <Segmented
             value={inputs.wifiGeneration}

@@ -8,7 +8,7 @@ import AuthGuard from '@/components/AuthGuard';
 import { useSession } from '@/components/SessionProvider';
 import InputPanel from '@/components/InputPanel';
 import CameraInputPanel from '@/components/CameraInputPanel';
-import BrandingModal from '@/components/BrandingModal';
+import SettingsModal from '@/components/SettingsModal';
 import { useBranding } from '@/hooks/useBranding';
 import { readableTextHex } from '@/lib/colors';
 import SummaryCards from '@/components/SummaryCards';
@@ -56,7 +56,7 @@ function Calculator() {
   const [currentProjectId, setCurrentProjectId] = useState(null);
   const [savedSnapshot, setSavedSnapshot] = useState(null);
   const [modal, setModal] = useState({ open: false, product: null });
-  const [brandingOpen, setBrandingOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
   // Super admins see every team's custom catalog rows (by RLS). The Product
@@ -102,16 +102,21 @@ function Calculator() {
       ),
     [inputs, priceOverrides, serviceOverrides, allProducts, customLineItems]
   );
+  // Per-project technology visibility (Settings → Technologies). A disabled
+  // system is excluded from its BOM, the tabs, totals, and exports.
+  const wifiEnabled = inputs.includeWifi !== false;
+  const camerasEnabled = inputs.includeCameras !== false;
+
   const cameraBom = useMemo(
     () =>
       calculateCameraBOM(
-        cameraInputs,
+        camerasEnabled ? cameraInputs : {},
         priceOverrides,
         serviceOverrides,
         allProducts,
-        customLineItems.filter((c) => c.system === 'camera')
+        camerasEnabled ? customLineItems.filter((c) => c.system === 'camera') : []
       ),
-    [cameraInputs, priceOverrides, serviceOverrides, allProducts, customLineItems]
+    [camerasEnabled, cameraInputs, priceOverrides, serviceOverrides, allProducts, customLineItems]
   );
   // Project-wide professional labor (the single labor source; see calculateLabor).
   const labor = useMemo(() => calculateLabor(laborRoles), [laborRoles]);
@@ -131,10 +136,21 @@ function Calculator() {
     setCustomLineItems((prev) => prev.filter((c) => c.id !== id));
   const term = getTerminology(inputs.propertyType);
 
-  const onCameras = activeTab === 'cameras';
+  // Hide a technology's tab when the project doesn't include it. If the active
+  // tab gets hidden, fall back to the first visible one (derived, no effect).
+  const visibleTabs = TABS.filter((t) => {
+    if (t.id === 'hardware') return wifiEnabled;
+    if (t.id === 'cameras') return camerasEnabled;
+    return true;
+  });
+  const tab = visibleTabs.some((t) => t.id === activeTab)
+    ? activeTab
+    : visibleTabs[0]?.id || 'summary';
+
+  const onCameras = tab === 'cameras';
   // Tab-dependent dashboard strip: Wi-Fi tab → Wi-Fi, Camera tab → cameras,
   // everything else (Services / Summary / Products) → combined.
-  const dashView = activeTab === 'hardware' ? 'wifi' : onCameras ? 'cameras' : 'both';
+  const dashView = tab === 'hardware' ? 'wifi' : onCameras ? 'cameras' : 'both';
 
   const hasChanges = useMemo(() => {
     if (!savedSnapshot) {
@@ -324,15 +340,13 @@ function Calculator() {
             <Button size="sm" onClick={handleExportProposal} title="Customer-facing proposal (sell price only)">
               <FileText size={14} /> Proposal
             </Button>
-            {canManageCatalog && (
-              <button
-                onClick={() => setBrandingOpen(true)}
-                title="Branding settings"
-                className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 shadow-sm hover:bg-slate-50 hover:text-slate-700"
-              >
-                <Settings size={15} />
-              </button>
-            )}
+            <button
+              onClick={() => setSettingsOpen(true)}
+              title="Settings (technologies, branding)"
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 shadow-sm hover:bg-slate-50 hover:text-slate-700"
+            >
+              <Settings size={15} />
+            </button>
             {isAdmin && (
               <Link
                 href="/admin"
@@ -368,13 +382,13 @@ function Calculator() {
 
         <main className="flex-1 space-y-4">
           <div className="flex gap-1 overflow-x-auto rounded-xl border border-slate-200/70 bg-white p-1 shadow-sm shadow-slate-900/[0.03]">
-            {TABS.map((t) => (
+            {visibleTabs.map((t) => (
               <button
                 key={t.id}
                 onClick={() => setActiveTab(t.id)}
                 className={cn(
                   'whitespace-nowrap rounded-lg px-3.5 py-1.5 text-sm font-medium transition-all',
-                  activeTab === t.id
+                  tab === t.id
                     ? 'bg-[var(--brand,#2563eb)] text-[var(--brand-text,#fff)] shadow-sm'
                     : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
                 )}
@@ -392,7 +406,7 @@ function Calculator() {
             term={term}
           />
 
-          {activeTab === 'hardware' && (
+          {tab === 'hardware' && (
             <BOMTable
               bom={bom}
               showMargin={showMargin}
@@ -406,7 +420,7 @@ function Calculator() {
               onRemoveCustom={removeCustomLine}
             />
           )}
-          {activeTab === 'services' && (
+          {tab === 'services' && (
             <div className="space-y-4">
               <div className="flex justify-end gap-2">
                 <Button variant="outline" size="sm" onClick={() => setShowMargin((s) => !s)}>
@@ -420,13 +434,13 @@ function Calculator() {
               </p>
             </div>
           )}
-          {activeTab === 'summary' && (
+          {tab === 'summary' && (
             <CostSummary
               sections={exportSections()}
               scope={buildScopeOfWork({ inputs, cameraInputs, wifiBom: bom, cameraBom, term })}
             />
           )}
-          {activeTab === 'cameras' && (
+          {tab === 'cameras' && (
             <CameraSystems
               cameraBom={cameraBom}
               showMargin={showMargin}
@@ -440,7 +454,7 @@ function Calculator() {
               onRemoveCustom={removeCustomLine}
             />
           )}
-          {activeTab === 'products' && (
+          {tab === 'products' && (
             <ProductDatabase
               allProducts={allProducts}
               canManageCatalog={canManageCatalog}
@@ -468,18 +482,22 @@ function Calculator() {
           onSave={saveCatalog}
         />
       )}
-      {brandingOpen && (
-        <BrandingModal
+      {settingsOpen && (
+        <SettingsModal
           branding={branding}
+          canManageBranding={canManageCatalog}
+          includeWifi={wifiEnabled}
+          includeCameras={camerasEnabled}
+          onToggleTech={(key, val) => setInputs((prev) => ({ ...prev, [key]: val }))}
           onSave={async (b) => {
             try {
               await setBranding(b);
-              setBrandingOpen(false);
+              setSettingsOpen(false);
             } catch (e) {
               alert(`Could not save branding: ${e.message}`);
             }
           }}
-          onClose={() => setBrandingOpen(false)}
+          onClose={() => setSettingsOpen(false)}
         />
       )}
     </div>
