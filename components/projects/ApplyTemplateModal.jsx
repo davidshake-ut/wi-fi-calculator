@@ -48,6 +48,7 @@ function PhasePreview({ phase }) {
 export default function ApplyTemplateModal({ open, technology, templates, projectStartDate, onApply, onClose }) {
   const [selectedId, setSelectedId] = useState(null);
   const [applying, setApplying] = useState(false);
+  const [error, setError] = useState(null);
 
   if (!open) return null;
 
@@ -60,9 +61,12 @@ export default function ApplyTemplateModal({ open, technology, templates, projec
   const handleApply = async () => {
     if (!selected) return;
     setApplying(true);
+    setError(null);
     try {
       await onApply(selected);
       onClose();
+    } catch (err) {
+      setError(err?.message ?? 'Failed to apply template.');
     } finally {
       setApplying(false);
     }
@@ -146,13 +150,18 @@ export default function ApplyTemplateModal({ open, technology, templates, projec
           </div>
         </div>
 
-        <div className="shrink-0 flex justify-end gap-2 border-t border-slate-100 px-6 py-4">
+        <div className="shrink-0 border-t border-slate-100 px-6 py-4 space-y-3">
+          {error && (
+            <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
+          )}
+          <div className="flex justify-end gap-2">
           <Button variant="outline" type="button" onClick={onClose}>
             Cancel
           </Button>
           <Button type="button" disabled={!selected || applying} onClick={handleApply}>
             {applying ? 'Applying…' : 'Apply Template'}
           </Button>
+          </div>
         </div>
       </div>
     </div>
