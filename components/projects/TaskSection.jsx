@@ -193,7 +193,7 @@ function MoveMenu({ label, items, onPick }) {
 }
 
 // ── SortableTaskRow ───────────────────────────────────────────────────────────
-function SortableTaskRow({ task, allProjectMilestones, onUpdate, onDelete, onMoveTask }) {
+function SortableTaskRow({ task, allProjectMilestones, onUpdate, onDelete, onMoveTask, getPalette }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id,
     data: { type: 'task', milestoneId: task.milestone_id },
@@ -236,11 +236,14 @@ function SortableTaskRow({ task, allProjectMilestones, onUpdate, onDelete, onMov
               onCommit={(v) => onUpdate(task.id, { title: v })}
               className={cn('text-sm text-slate-700', task.status === 'done' && 'line-through text-slate-400')}
             />
-            {task.role && (
-              <span className="flex shrink-0 items-center gap-1 rounded-full bg-blue-50 px-1.5 py-0.5 text-[10px] text-blue-600">
-                <User size={9} /> {task.role}
-              </span>
-            )}
+            {task.role && (() => {
+              const p = getPalette ? getPalette(task.role) : { badge: 'bg-blue-50 text-blue-600' };
+              return (
+                <span className={cn('flex shrink-0 items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px]', p.badge)}>
+                  <User size={9} /> {task.role}
+                </span>
+              );
+            })()}
             {task.estimated_hours != null && (
               <span className="shrink-0 text-[10px] text-slate-400">{task.estimated_hours}h</span>
             )}
@@ -329,6 +332,7 @@ function SortableMilestoneBlock({
   onMoveTask,
   onCreateTask,
   onMoveMilestoneToSection,
+  getPalette,
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: milestone.id,
@@ -424,6 +428,7 @@ function SortableMilestoneBlock({
                 onUpdate={onUpdateTask}
                 onDelete={onDeleteTask}
                 onMoveTask={onMoveTask}
+                getPalette={getPalette}
               />
             ))}
           </SortableContext>
@@ -452,6 +457,7 @@ export default function TaskSection({
   onBatchUpdateMilestones,
   onBatchUpdateTasks,
   onMoveMilestoneToSection,
+  getPalette,
 }) {
   const [activeId, setActiveId] = useState(null);
   const [activeType, setActiveType] = useState(null);
@@ -560,6 +566,7 @@ export default function TaskSection({
                 onMoveTask={handleMoveTask}
                 onCreateTask={onCreateTask}
                 onMoveMilestoneToSection={onMoveMilestoneToSection}
+                getPalette={getPalette}
               />
             );
           })}
@@ -581,6 +588,7 @@ export default function TaskSection({
                   onUpdate={onUpdateTask}
                   onDelete={onDeleteTask}
                   onMoveTask={handleMoveTask}
+                  getPalette={getPalette}
                 />
               ))}
             </SortableContext>

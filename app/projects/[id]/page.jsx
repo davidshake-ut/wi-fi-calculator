@@ -21,6 +21,7 @@ import ApplyTemplateModal from '@/components/projects/ApplyTemplateModal';
 import { Select, Button } from '@/components/ui/primitives';
 import { TECHNOLOGIES } from '@/lib/templates/index';
 import { cn } from '@/lib/utils';
+import { useRoleColors } from '@/hooks/useRoleColors';
 
 const TABS = [
   { id: 'tasks',    label: 'Tasks'    },
@@ -97,6 +98,8 @@ function ProjectDetail() {
 
   const { allTemplates } = useTemplates(session, company, user);
 
+  const { getRoleColor, setRoleColor, getPalette } = useRoleColors();
+
   const [tab, setTab] = useState('tasks');
   const [applyModal, setApplyModal] = useState(null);
   const [addingTech, setAddingTech] = useState(false);
@@ -143,6 +146,7 @@ function ProjectDetail() {
     onBatchUpdateMilestones: batchUpdateMilestones,
     onBatchUpdateTasks: batchUpdateTasks,
     onMoveMilestoneToSection: moveMilestoneToSection,
+    getPalette,
   };
 
   return (
@@ -359,6 +363,10 @@ function ProjectDetail() {
             technologies={technologies}
             milestones={milestones}
             tasks={tasks}
+            onUpdateMilestone={updateMilestone}
+            onUpdateTask={updateTask}
+            getRoleColor={getRoleColor}
+            setRoleColor={setRoleColor}
           />
         )}
 
