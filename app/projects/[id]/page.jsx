@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import {
   ArrowLeft, Calendar, DollarSign, Building2, Loader2, AlertCircle,
-  LayoutTemplate, Plus, Trash2, ChevronDown, ChevronRight, GitMerge,
+  LayoutTemplate, Plus, Trash2, ChevronDown, ChevronRight, GitMerge, Pencil, Check, X,
 } from 'lucide-react';
 import AuthGuard from '@/components/AuthGuard';
 import OSShell from '@/components/OSShell';
@@ -39,6 +39,44 @@ function fmtDate(iso) {
 function fmt(n) {
   if (n == null) return null;
   return `$${Number(n).toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
+}
+
+// Inline-editable tech section name pill
+function EditableTechName({ value, onSave }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+
+  const commit = async () => {
+    const v = draft.trim();
+    if (v && v !== value) await onSave(v);
+    setEditing(false);
+  };
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-1">
+        <input
+          autoFocus
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setEditing(false); }}
+          className="rounded-full border border-blue-400 bg-white px-3 py-0.5 text-sm font-semibold text-blue-700 outline-none ring-2 ring-blue-400/20"
+        />
+        <button onClick={commit} className="rounded p-1 text-emerald-600 hover:bg-emerald-50"><Check size={13} /></button>
+        <button onClick={() => setEditing(false)} className="rounded p-1 text-slate-400 hover:bg-slate-100"><X size={13} /></button>
+      </div>
+    );
+  }
+  return (
+    <button
+      type="button"
+      onClick={() => { setDraft(value); setEditing(true); }}
+      className="group flex items-center gap-1.5 rounded-full bg-blue-100 px-3 py-0.5 text-sm font-semibold text-blue-700 hover:bg-blue-200 transition-colors"
+    >
+      {value}
+      <Pencil size={11} className="opacity-0 transition-opacity group-hover:opacity-60" />
+    </button>
+  );
 }
 
 // Small inline dropdown for "Merge into another section"
@@ -91,7 +129,7 @@ function ProjectDetail() {
     createMilestone, updateMilestone, deleteMilestone,
     createTask, updateTask, deleteTask,
     logTime, deleteTimeEntry,
-    createTechnology, deleteTechnology, applyTemplate,
+    createTechnology, updateTechnology, deleteTechnology, applyTemplate,
     batchUpdateMilestones, batchUpdateTasks,
     moveMilestoneToSection, mergeTechnologies,
   } = usePSAProject(id, session);
@@ -249,10 +287,11 @@ function ProjectDetail() {
                         {collapsed ? <ChevronRight size={15} /> : <ChevronDown size={15} />}
                       </button>
 
-                      {/* Tech badge */}
-                      <span className="rounded-full bg-blue-100 px-3 py-0.5 text-sm font-semibold text-blue-700">
-                        {tech.technology}
-                      </span>
+                      {/* Tech badge — click to rename */}
+                      <EditableTechName
+                        value={tech.technology}
+                        onSave={(name) => updateTechnology(tech.id, { technology: name })}
+                      />
                       <span className="text-xs text-slate-400">
                         {techMs.length} phase{techMs.length !== 1 ? 's' : ''} · {techTasks.length} task{techTasks.length !== 1 ? 's' : ''}
                       </span>

@@ -361,6 +361,22 @@ export function usePSAProject(projectId, session) {
     [supabase, projectId, technologies, refresh]
   );
 
+  const updateTechnology = useCallback(
+    async (id, data) => {
+      if (!supabase) {
+        writePsa((s) => ({
+          ...s,
+          technologies: (s.technologies ?? []).map((t) => (t.id === id ? { ...t, ...data } : t)),
+        }));
+        return;
+      }
+      const { error } = await supabase.from('project_technologies').update(data).eq('id', id);
+      if (error) throw error;
+      await refresh();
+    },
+    [supabase, refresh]
+  );
+
   const deleteTechnology = useCallback(
     async (id) => {
       if (!supabase) {
@@ -456,6 +472,7 @@ export function usePSAProject(projectId, session) {
     logTime,
     deleteTimeEntry,
     createTechnology,
+    updateTechnology,
     deleteTechnology,
     applyTemplate,
     batchUpdateMilestones,

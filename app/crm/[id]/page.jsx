@@ -61,6 +61,54 @@ function EditableField({ label, value, onSave, type = 'text', placeholder }) {
   );
 }
 
+function EditableTextarea({ label, value, onSave, placeholder }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value ?? '');
+  const commit = async () => {
+    const v = draft.trim() || null;
+    if (v !== (value ?? null)) await onSave(v);
+    setEditing(false);
+  };
+  if (editing) {
+    return (
+      <div>
+        <p className="mb-1 text-xs font-medium text-slate-400">{label}</p>
+        <textarea
+          autoFocus
+          rows={4}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Escape') setEditing(false); }}
+          placeholder={placeholder}
+          className="w-full rounded-lg border border-blue-400 px-2 py-1.5 text-sm outline-none ring-2 ring-blue-500/20 resize-none"
+        />
+        <div className="mt-1.5 flex gap-1">
+          <button onClick={commit} className="flex items-center gap-1 rounded-lg bg-blue-600 px-2.5 py-1 text-xs text-white hover:bg-blue-700">
+            <Check size={12} /> Save
+          </button>
+          <button onClick={() => { setDraft(value ?? ''); setEditing(false); }} className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs text-slate-500 hover:bg-slate-50">
+            Cancel
+          </button>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div>
+      <p className="mb-0.5 text-xs font-medium text-slate-400">{label}</p>
+      <button
+        onClick={() => { setDraft(value ?? ''); setEditing(true); }}
+        className="group flex w-full items-start gap-1 text-left text-sm text-slate-700 hover:text-blue-600"
+      >
+        <span className="flex-1 whitespace-pre-wrap">
+          {value || <span className="italic text-slate-300">—</span>}
+        </span>
+        <Pencil size={11} className="mt-0.5 shrink-0 opacity-0 transition-opacity group-hover:opacity-100" />
+      </button>
+    </div>
+  );
+}
+
 function AccountDetail() {
   const { id } = useParams();
   const { session } = useSession();
@@ -118,12 +166,9 @@ function AccountDetail() {
         {tab === 'overview' && (
           <div className="max-w-lg rounded-xl border border-slate-200 bg-white p-5 space-y-4">
             <EditableField label="Phone" value={account.phone} onSave={(v) => updateAccount({ phone: v })} type="tel" placeholder="(555) 000-0000" />
-            <EditableField label="Website" value={account.website} onSave={(v) => updateAccount({ website: v })} type="url" placeholder="https://…" />
+            <EditableField label="Website" value={account.website} onSave={(v) => updateAccount({ website: v })} placeholder="https://…" />
             <EditableField label="Address" value={account.address} onSave={(v) => updateAccount({ address: v })} placeholder="123 Main St…" />
-            <div>
-              <p className="mb-0.5 text-xs font-medium text-slate-400">Notes</p>
-              <p className="text-sm text-slate-600 whitespace-pre-wrap">{account.notes || <span className="italic text-slate-300">—</span>}</p>
-            </div>
+            <EditableTextarea label="Notes" value={account.notes} onSave={(v) => updateAccount({ notes: v })} placeholder="Add notes about this account…" />
           </div>
         )}
       </div>
