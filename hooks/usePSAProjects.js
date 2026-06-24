@@ -1,0 +1,113 @@
+'use client';
+
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
+import { getSupabase, isSupabaseConfigured } from '@/lib/supabase/client';
+import {
+  getPsaSnapshot,
+  getPsaServerSnapshot,
+  subscribePsa,
+  writePsa,
+  newPsaId,
+} from '@/lib/psaLocalStore';
+
+// Project list CRUD. Returns all projects for the current tenant.
+export function usePSAProjects(session, company, user) {
+  const supabase = getSupabase();
+  const localData = useSyncExternalStore(subscribePsa, getPsaSnapshot, getPsaServerSnapshot);
+  const [remoteProjects, setRemoteProjects] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  const projects = supabase ? remoteProjects : localData.projects;
+
+  const refresh = useCallback(async () => {
+    if (!supabase) return;
+    setLoading(true);
+    const { data } = await supabase
+      .from('psa_projects')
+      .select('*, saved_projects(project_name)')
+      .order('created_at', { ascending: false });
+    setRemoteProjects(data || []);
+    setLoading(false);
+  }, [supabase]);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured || !supabase || !session) return;
+    void (async () => {
+      await refresh();
+    })();
+  }, [supabase, session, refresh]);
+
+  const createProject = useCallback(
+    async (data) => {
+      const now = new Date().toISOString();
+      if (!supabase) {
+        const proj = {
+          id: newPsaId(),
+          company_id: 'local',
+          ...data,
+          created_by: 'local',
+          created_at: now,
+          updated_at: now,
+        };
+        writePsa((s) => ({ ...s, projects: [proj, ...s.projects] }));
+        return proj;
+      }
+      const { data: proj, error } = await supabase
+        .from('psa_projects')
+        .insert({
+          ...data,
+          company_id: company?.id,
+          created_by: user?.id ?? null,
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      await refresh();
+      return proj;
+    },
+    [supabase, company, user, refresh]
+  );
+
+  const updateProject = useCallback(
+    async (id, data) => {
+      const now = new Date().toISOString();
+      if (!supabase) {
+        writePsa((s) => ({
+          ...s,
+          projects: s.projects.map((p) =>
+            p.id === id ? { ...p, ...data, updated_at: now } : p
+          ),
+        }));
+        return;
+      }
+      const { error } = await supabase
+        .from('psa_projects')
+        .update({ ...data, updated_at: now })
+        .eq('id', id);
+      if (error) throw error;
+      await refresh();
+    },
+    [supabase, refresh]
+  );
+
+  const deleteProject = useCallback(
+    async (id) => {
+      if (!supabase) {
+        writePsa((s) => ({
+          ...s,
+          projects: s.projects.filter((p) => p.id !== id),
+          milestones: s.milestones.filter((m) => m.project_id !== id),
+          tasks: s.tasks.filter((t) => t.project_id !== id),
+          time_entries: s.time_entries.filter((e) => e.project_id !== id),
+        }));
+        return;
+      }
+      const { error } = await supabase.from('psa_projects').delete().eq('id', id);
+      if (error) throw error;
+      await refresh();
+    },
+    [supabase, refresh]
+  );
+
+  return { projects, loading, refresh, createProject, updateProject, deleteProject };
+}

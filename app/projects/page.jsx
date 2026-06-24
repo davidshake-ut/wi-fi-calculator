@@ -1,100 +1,173 @@
 'use client';
 
-import { Plus, Calendar, DollarSign, Clock, CheckCircle2, Circle, AlertCircle } from 'lucide-react';
+import { useState } from 'react';
+import Link from 'next/link';
+import {
+  Plus,
+  Calendar,
+  DollarSign,
+  CheckCircle2,
+  Circle,
+  Trash2,
+  FolderKanban,
+} from 'lucide-react';
 import AuthGuard from '@/components/AuthGuard';
 import OSShell from '@/components/OSShell';
+import { useSession } from '@/components/SessionProvider';
+import { usePSAProjects } from '@/hooks/usePSAProjects';
+import { useProjects } from '@/hooks/useProjects';
+import ProjectStatusBadge, { STATUS_CONFIG } from '@/components/projects/ProjectStatusBadge';
+import NewProjectModal from '@/components/projects/NewProjectModal';
 import { Card, Button } from '@/components/ui/primitives';
 import { cn } from '@/lib/utils';
 
-const STATUS_COLUMNS = [
-  {
-    id: 'planning',
-    label: 'Planning',
-    color: 'text-amber-600',
-    bg: 'bg-amber-50',
-    icon: Circle,
-    projects: [
-      { name: 'Sunrise Senior Living — Phase 2', customer: 'Sunrise Corp', budget: '$142,000', due: 'Q3 2026' },
-    ],
-  },
-  {
-    id: 'active',
-    label: 'Active',
-    color: 'text-blue-600',
-    bg: 'bg-blue-50',
-    icon: AlertCircle,
-    projects: [
-      { name: 'Metro Apartments Wi-Fi Upgrade', customer: 'Metro LLC', budget: '$88,500', due: 'Jul 2026' },
-      { name: 'Acme Hotels — Camera Systems', customer: 'Acme Hotels', budget: '$215,000', due: 'Aug 2026' },
-    ],
-  },
-  {
-    id: 'complete',
-    label: 'Complete',
-    color: 'text-emerald-600',
-    bg: 'bg-emerald-50',
-    icon: CheckCircle2,
-    projects: [],
-  },
-];
+const ALL_STATUSES = Object.keys(STATUS_CONFIG);
+
+function fmt(n) {
+  if (n == null) return '—';
+  return `$${Number(n).toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
+}
+
+function fmtDate(iso) {
+  if (!iso) return '—';
+  return new Date(iso + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
 
 function ProjectsContent() {
+  const { session, company, user } = useSession();
+  const { projects, loading, createProject, deleteProject } = usePSAProjects(session, company, user);
+  const { projects: quotes } = useProjects(session, company, user);
+
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [modalOpen, setModalOpen] = useState(false);
+  const [deleting, setDeleting] = useState(null);
+
+  const filtered = statusFilter === 'all'
+    ? projects
+    : projects.filter((p) => p.status === statusFilter);
+
+  const handleDelete = async (p) => {
+    if (!confirm(`Delete project "${p.name}"? This will also remove all its tasks and time entries.`)) return;
+    setDeleting(p.id);
+    try { await deleteProject(p.id); } finally { setDeleting(null); }
+  };
+
+  const counts = ALL_STATUSES.reduce((acc, s) => {
+    acc[s] = projects.filter((p) => p.status === s).length;
+    return acc;
+  }, {});
+
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-5">
+      {/* Header */}
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-xl font-semibold text-slate-900">Projects</h1>
           <p className="mt-1 text-sm text-slate-500">
-            PSA — plan, track, and deliver projects linked to your System Builder quotes
+            {projects.length} project{projects.length !== 1 ? 's' : ''} total
           </p>
         </div>
-        <Button size="sm" disabled title="Coming soon">
+        <Button size="sm" onClick={() => setModalOpen(true)}>
           <Plus size={14} /> New Project
         </Button>
       </div>
 
-      {/* Kanban columns */}
-      <div className="grid gap-4 lg:grid-cols-3">
-        {STATUS_COLUMNS.map(({ id, label, color, bg, icon: Icon, projects }) => (
-          <div key={id} className="space-y-3">
-            <div className={cn('flex items-center gap-2 rounded-lg px-3 py-2', bg)}>
-              <Icon size={14} className={color} />
-              <span className={cn('text-xs font-semibold uppercase tracking-wide', color)}>
-                {label}
-              </span>
-              <span className={cn('ml-auto text-xs font-medium', color)}>{projects.length}</span>
-            </div>
-
-            {projects.map((p) => (
-              <Card key={p.name} className="p-4 opacity-60 space-y-2">
-                <p className="text-sm font-medium text-slate-800 leading-snug">{p.name}</p>
-                <p className="text-xs text-slate-400">{p.customer}</p>
-                <div className="flex items-center gap-3 text-xs text-slate-400">
-                  <span className="flex items-center gap-1"><DollarSign size={11} />{p.budget}</span>
-                  <span className="flex items-center gap-1"><Calendar size={11} />{p.due}</span>
-                </div>
-              </Card>
-            ))}
-
-            {projects.length === 0 && (
-              <div className="rounded-xl border-2 border-dashed border-slate-200 p-6 text-center">
-                <p className="text-xs text-slate-400">No {label.toLowerCase()} projects</p>
-              </div>
+      {/* Status filter tabs */}
+      <div className="flex gap-1 overflow-x-auto rounded-xl border border-slate-200/70 bg-white p-1 shadow-sm shadow-slate-900/[0.03]">
+        <button
+          onClick={() => setStatusFilter('all')}
+          className={cn(
+            'whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition-all',
+            statusFilter === 'all'
+              ? 'bg-blue-600 text-white shadow-sm'
+              : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
+          )}
+        >
+          All <span className="ml-1 text-xs opacity-70">{projects.length}</span>
+        </button>
+        {ALL_STATUSES.map((s) => (
+          <button
+            key={s}
+            onClick={() => setStatusFilter(s)}
+            className={cn(
+              'whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition-all',
+              statusFilter === s
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
             )}
-          </div>
+          >
+            {STATUS_CONFIG[s].label}{' '}
+            <span className="ml-0.5 text-xs opacity-70">{counts[s] || 0}</span>
+          </button>
         ))}
       </div>
 
-      <Card className="p-6 text-center">
-        <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50">
-          <Clock size={22} className="text-blue-500" />
+      {/* Project list */}
+      {loading ? (
+        <p className="py-12 text-center text-sm text-slate-400">Loading projects…</p>
+      ) : filtered.length === 0 ? (
+        <Card className="py-16 text-center">
+          <FolderKanban size={32} className="mx-auto mb-3 text-slate-300" />
+          <p className="text-sm font-medium text-slate-600">
+            {statusFilter === 'all' ? 'No projects yet' : `No ${STATUS_CONFIG[statusFilter]?.label.toLowerCase()} projects`}
+          </p>
+          <p className="mt-1 text-sm text-slate-400">
+            {statusFilter === 'all' && 'Create your first project to get started.'}
+          </p>
+          {statusFilter === 'all' && (
+            <Button size="sm" className="mt-4" onClick={() => setModalOpen(true)}>
+              <Plus size={14} /> New Project
+            </Button>
+          )}
+        </Card>
+      ) : (
+        <div className="space-y-2">
+          {filtered.map((proj) => (
+            <Card
+              key={proj.id}
+              className="group flex items-center gap-4 px-5 py-4 transition-shadow hover:shadow-md"
+            >
+              <Link href={`/projects/${proj.id}`} className="flex flex-1 items-center gap-4 min-w-0">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-slate-900">{proj.name}</p>
+                  {proj.customer_name && (
+                    <p className="truncate text-xs text-slate-500">{proj.customer_name}</p>
+                  )}
+                </div>
+
+                <div className="hidden items-center gap-1 text-xs text-slate-400 sm:flex">
+                  <Calendar size={12} />
+                  {proj.start_date ? fmtDate(proj.start_date) : '—'}
+                  {proj.end_date && <> – {fmtDate(proj.end_date)}</>}
+                </div>
+
+                <div className="hidden items-center gap-1 text-xs text-slate-500 sm:flex">
+                  <DollarSign size={12} />
+                  {fmt(proj.budget)}
+                </div>
+
+                <ProjectStatusBadge status={proj.status} />
+              </Link>
+
+              <button
+                onClick={() => handleDelete(proj)}
+                disabled={deleting === proj.id}
+                className="shrink-0 rounded-lg p-1.5 text-slate-300 opacity-0 transition-all group-hover:opacity-100 hover:bg-red-50 hover:text-red-500"
+                title="Delete project"
+              >
+                <Trash2 size={15} />
+              </button>
+            </Card>
+          ))}
         </div>
-        <h3 className="text-sm font-semibold text-slate-700">Project Management coming soon</h3>
-        <p className="mt-1 text-sm text-slate-400 max-w-sm mx-auto">
-          Full PSA capabilities — milestones, tasks, time tracking, budget vs. actuals, and resource scheduling.
-          Projects link directly to System Builder quotes.
-        </p>
-      </Card>
+      )}
+
+      <NewProjectModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        onSave={createProject}
+        quotes={quotes}
+      />
     </div>
   );
 }
