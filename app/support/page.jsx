@@ -1,99 +1,136 @@
 'use client';
 
-import { Plus, AlertCircle, CheckCircle2, Clock, Tag } from 'lucide-react';
+import { useState } from 'react';
+import Link from 'next/link';
+import { Plus, Inbox, Trash2 } from 'lucide-react';
 import AuthGuard from '@/components/AuthGuard';
 import OSShell from '@/components/OSShell';
+import { useSession } from '@/components/SessionProvider';
+import { useSupportTickets } from '@/hooks/useSupportTickets';
+import { useCRMAccounts } from '@/hooks/useCRMAccounts';
+import NewTicketModal from '@/components/support/NewTicketModal';
+import TicketPriorityBadge, { TicketStatusBadge, STATUS_CONFIG } from '@/components/support/TicketPriorityBadge';
 import { Card, Button } from '@/components/ui/primitives';
 import { cn } from '@/lib/utils';
 
-const PLACEHOLDER_TICKETS = [
-  { id: 'TKT-001', title: 'Wi-Fi drops intermittently in Building B', customer: 'Acme Hotels', priority: 'High',   status: 'Open',        age: '2h' },
-  { id: 'TKT-002', title: 'Camera offline — Entrance Gate 3',         customer: 'Metro LLC',   priority: 'Medium', status: 'In Progress', age: '1d' },
-  { id: 'TKT-003', title: 'Slow speeds reported in Room 204–208',     customer: 'Sunrise Corp',priority: 'Low',    status: 'Open',        age: '3d' },
-];
+const ALL_STATUSES = Object.keys(STATUS_CONFIG);
 
-const PRIORITY_STYLES = {
-  High:   'bg-red-50 text-red-600',
-  Medium: 'bg-amber-50 text-amber-600',
-  Low:    'bg-slate-100 text-slate-500',
-};
-
-const STATUS_ICONS = {
-  Open:        AlertCircle,
-  'In Progress': Clock,
-  Resolved:    CheckCircle2,
-};
+function timeAgo(iso) {
+  if (!iso) return '';
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
 
 function SupportContent() {
+  const { session, company, user } = useSession();
+  const { tickets, loading, createTicket, deleteTicket } = useSupportTickets(session, company, user);
+  const { accounts } = useCRMAccounts(session, company, user);
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [modalOpen, setModalOpen] = useState(false);
+  const [deleting, setDeleting] = useState(null);
+
+  const filtered = statusFilter === 'all' ? tickets : tickets.filter((t) => t.status === statusFilter);
+
+  const counts = ALL_STATUSES.reduce((acc, s) => {
+    acc[s] = tickets.filter((t) => t.status === s).length;
+    return acc;
+  }, {});
+
+  const statCounts = {
+    open:     tickets.filter((t) => t.status === 'open').length,
+    progress: tickets.filter((t) => t.status === 'in_progress').length,
+    resolved: tickets.filter((t) => t.status === 'resolved').length,
+  };
+
+  const handleDelete = async (t) => {
+    if (!confirm(`Delete ticket "${t.title}"?`)) return;
+    setDeleting(t.id);
+    try { await deleteTicket(t.id); } finally { setDeleting(null); }
+  };
+
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-5">
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-xl font-semibold text-slate-900">Customer Support</h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Ticket management — track, triage, and resolve customer issues
-          </p>
+          <p className="mt-1 text-sm text-slate-500">{tickets.length} ticket{tickets.length !== 1 ? 's' : ''} total</p>
         </div>
-        <Button size="sm" disabled title="Coming soon">
-          <Plus size={14} /> New Ticket
-        </Button>
+        <Button size="sm" onClick={() => setModalOpen(true)}><Plus size={14} /> New Ticket</Button>
       </div>
 
       {/* Stats strip */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-3 gap-3">
         {[
-          { label: 'Open', value: '—', color: 'text-red-600' },
-          { label: 'In Progress', value: '—', color: 'text-amber-600' },
-          { label: 'Resolved Today', value: '—', color: 'text-emerald-600' },
+          { label: 'Open',        value: statCounts.open,     color: 'text-blue-600' },
+          { label: 'In Progress', value: statCounts.progress, color: 'text-violet-600' },
+          { label: 'Resolved',    value: statCounts.resolved, color: 'text-emerald-600' },
         ].map(({ label, value, color }) => (
           <Card key={label} className="p-4 text-center">
-            <p className={cn('text-2xl font-bold', color)}>{value}</p>
+            <p className={cn('text-2xl font-bold tabular-nums', color)}>{value}</p>
             <p className="mt-1 text-xs text-slate-400">{label}</p>
           </Card>
         ))}
       </div>
 
-      {/* Ticket list */}
-      <Card className="divide-y divide-slate-100">
-        {PLACEHOLDER_TICKETS.map((t) => {
-          const StatusIcon = STATUS_ICONS[t.status] || AlertCircle;
-          return (
-            <div key={t.id} className="flex items-start gap-4 p-4 opacity-50">
-              <StatusIcon size={16} className="mt-0.5 shrink-0 text-slate-400" />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-slate-800 truncate">{t.title}</p>
-                <p className="text-xs text-slate-400">{t.customer} · {t.age} ago</p>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', PRIORITY_STYLES[t.priority])}>
-                  {t.priority}
-                </span>
-                <span className="text-xs text-slate-400">{t.id}</span>
-              </div>
-            </div>
-          );
-        })}
-      </Card>
+      {/* Status filter */}
+      <div className="flex gap-1 overflow-x-auto rounded-xl border border-slate-200/70 bg-white p-1 shadow-sm shadow-slate-900/[0.03]">
+        <button onClick={() => setStatusFilter('all')}
+          className={cn('whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition-all',
+            statusFilter === 'all' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100')}>
+          All <span className="ml-1 text-xs opacity-70">{tickets.length}</span>
+        </button>
+        {ALL_STATUSES.map((s) => (
+          <button key={s} onClick={() => setStatusFilter(s)}
+            className={cn('whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition-all',
+              statusFilter === s ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100')}>
+            {STATUS_CONFIG[s].label} <span className="ml-0.5 text-xs opacity-70">{counts[s] || 0}</span>
+          </button>
+        ))}
+      </div>
 
-      <Card className="p-6 text-center">
-        <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50">
-          <Tag size={22} className="text-blue-500" />
+      {/* Ticket list */}
+      {loading ? (
+        <p className="py-12 text-center text-sm text-slate-400">Loading tickets…</p>
+      ) : filtered.length === 0 ? (
+        <Card className="py-16 text-center">
+          <Inbox size={32} className="mx-auto mb-3 text-slate-300" />
+          <p className="text-sm font-medium text-slate-600">{statusFilter === 'all' ? 'No tickets yet' : `No ${STATUS_CONFIG[statusFilter]?.label.toLowerCase()} tickets`}</p>
+          {statusFilter === 'all' && <Button size="sm" className="mt-4" onClick={() => setModalOpen(true)}><Plus size={14} /> New Ticket</Button>}
+        </Card>
+      ) : (
+        <div className="space-y-2">
+          {filtered.map((t) => (
+            <Card key={t.id} className="group flex items-center gap-4 px-5 py-4 transition-shadow hover:shadow-md">
+              <Link href={`/support/${t.id}`} className="flex flex-1 items-center gap-4 min-w-0">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-slate-900">{t.title}</p>
+                  <p className="text-xs text-slate-400">
+                    {t.crm_accounts?.name ?? 'No account'} · {timeAgo(t.created_at)}
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <TicketPriorityBadge priority={t.priority} />
+                  <TicketStatusBadge status={t.status} />
+                </div>
+              </Link>
+              <button onClick={() => handleDelete(t)} disabled={deleting === t.id}
+                className="shrink-0 rounded-lg p-1.5 text-slate-300 opacity-0 transition-all group-hover:opacity-100 hover:bg-red-50 hover:text-red-500">
+                <Trash2 size={15} />
+              </button>
+            </Card>
+          ))}
         </div>
-        <h3 className="text-sm font-semibold text-slate-700">Support module coming soon</h3>
-        <p className="mt-1 text-sm text-slate-400 max-w-sm mx-auto">
-          Full ticket management with alerts, SLA tracking, and a shareable portal for support partners.
-        </p>
-      </Card>
+      )}
+
+      <NewTicketModal open={modalOpen} onClose={() => setModalOpen(false)} onSave={createTicket} accounts={accounts} />
     </div>
   );
 }
 
 export default function SupportPage() {
-  return (
-    <AuthGuard>
-      <OSShell>
-        <SupportContent />
-      </OSShell>
-    </AuthGuard>
-  );
+  return <AuthGuard><OSShell><SupportContent /></OSShell></AuthGuard>;
 }

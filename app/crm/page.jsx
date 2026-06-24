@@ -1,81 +1,123 @@
 'use client';
 
-import { Search, UserPlus, Phone, Mail, Building2 } from 'lucide-react';
+import { useState } from 'react';
+import Link from 'next/link';
+import { Plus, Search, Building2, Phone, Globe, Trash2 } from 'lucide-react';
 import AuthGuard from '@/components/AuthGuard';
 import OSShell from '@/components/OSShell';
+import { useSession } from '@/components/SessionProvider';
+import { useCRMAccounts } from '@/hooks/useCRMAccounts';
+import NewAccountModal from '@/components/crm/NewAccountModal';
 import { Card, Button } from '@/components/ui/primitives';
+import { cn } from '@/lib/utils';
 
-const PLACEHOLDER_CONTACTS = [
-  { name: 'Acme Hotels Group',     type: 'Hospitality',    contacts: 3, status: 'Active' },
-  { name: 'Sunrise Senior Living', type: 'Senior Living',  contacts: 2, status: 'Active' },
-  { name: 'Metro Apartments LLC',  type: 'Multi-Family',   contacts: 1, status: 'Prospect' },
-];
+const TYPE_LABELS = {
+  hospitality: 'Hospitality', senior_living: 'Senior Living',
+  multi_family: 'Multi-Family', education: 'Education',
+  healthcare: 'Healthcare', other: 'Other',
+};
+
+const STATUS_STYLES = {
+  active:   'bg-emerald-50 text-emerald-700 border-emerald-200',
+  prospect: 'bg-amber-50 text-amber-700 border-amber-200',
+  inactive: 'bg-slate-100 text-slate-500 border-slate-200',
+};
 
 function CRMContent() {
+  const { session, company, user } = useSession();
+  const { accounts, loading, createAccount, deleteAccount } = useCRMAccounts(session, company, user);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [modalOpen, setModalOpen] = useState(false);
+  const [deleting, setDeleting] = useState(null);
+
+  const filtered = accounts.filter((a) => {
+    const matchSearch = !search || a.name.toLowerCase().includes(search.toLowerCase());
+    const matchStatus = statusFilter === 'all' || a.status === statusFilter;
+    return matchSearch && matchStatus;
+  });
+
+  const handleDelete = async (a) => {
+    if (!confirm(`Delete "${a.name}"? This will also remove all contacts.`)) return;
+    setDeleting(a.id);
+    try { await deleteAccount(a.id); } finally { setDeleting(null); }
+  };
+
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-5">
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-xl font-semibold text-slate-900">CRM</h1>
-          <p className="mt-1 text-sm text-slate-500">Customer and contact management</p>
+          <p className="mt-1 text-sm text-slate-500">{accounts.length} account{accounts.length !== 1 ? 's' : ''}</p>
         </div>
-        <Button size="sm" disabled title="Coming soon">
-          <UserPlus size={14} /> Add Customer
+        <Button size="sm" onClick={() => setModalOpen(true)}>
+          <Plus size={14} /> New Account
         </Button>
       </div>
 
-      {/* Search bar placeholder */}
-      <div className="relative">
-        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-        <input
-          disabled
-          placeholder="Search customers, contacts, opportunities…"
-          className="h-9 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-400 shadow-sm outline-none"
-        />
+      {/* Search + status filter */}
+      <div className="flex flex-col gap-3 sm:flex-row">
+        <div className="relative flex-1">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            value={search} onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search accounts…"
+            className="h-9 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-900 shadow-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+          />
+        </div>
+        <div className="flex gap-1 rounded-xl border border-slate-200/70 bg-white p-1 shadow-sm shadow-slate-900/[0.03]">
+          {['all', 'active', 'prospect', 'inactive'].map((s) => (
+            <button key={s} onClick={() => setStatusFilter(s)}
+              className={cn('whitespace-nowrap rounded-lg px-3 py-1 text-xs font-medium transition-all capitalize',
+                statusFilter === s ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100'
+              )}
+            >{s === 'all' ? 'All' : s.charAt(0).toUpperCase() + s.slice(1)}</button>
+          ))}
+        </div>
       </div>
 
-      {/* Placeholder account cards */}
-      <div className="space-y-3">
-        {PLACEHOLDER_CONTACTS.map((c) => (
-          <Card key={c.name} className="flex items-center gap-4 p-4 opacity-50">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100">
-              <Building2 size={18} className="text-slate-500" />
-            </span>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-slate-800 truncate">{c.name}</p>
-              <p className="text-xs text-slate-400">{c.type} · {c.contacts} contact{c.contacts !== 1 ? 's' : ''}</p>
-            </div>
-            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${c.status === 'Active' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
-              {c.status}
-            </span>
-          </Card>
-        ))}
-      </div>
+      {loading ? (
+        <p className="py-12 text-center text-sm text-slate-400">Loading accounts…</p>
+      ) : filtered.length === 0 ? (
+        <Card className="py-16 text-center">
+          <Building2 size={32} className="mx-auto mb-3 text-slate-300" />
+          <p className="text-sm font-medium text-slate-600">{search ? 'No accounts match your search' : 'No accounts yet'}</p>
+          {!search && <Button size="sm" className="mt-4" onClick={() => setModalOpen(true)}><Plus size={14} /> New Account</Button>}
+        </Card>
+      ) : (
+        <div className="space-y-2">
+          {filtered.map((a) => (
+            <Card key={a.id} className="group flex items-center gap-4 px-5 py-4 transition-shadow hover:shadow-md">
+              <Link href={`/crm/${a.id}`} className="flex flex-1 items-center gap-4 min-w-0">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100">
+                  <Building2 size={18} className="text-slate-500" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-slate-900">{a.name}</p>
+                  <p className="text-xs text-slate-400">{TYPE_LABELS[a.type] ?? a.type}</p>
+                </div>
+                <div className="hidden items-center gap-3 sm:flex">
+                  {a.phone && <span className="flex items-center gap-1 text-xs text-slate-400"><Phone size={11} />{a.phone}</span>}
+                  {a.website && <span className="flex items-center gap-1 text-xs text-slate-400"><Globe size={11} />{a.website.replace(/^https?:\/\//, '')}</span>}
+                </div>
+                <span className={cn('shrink-0 rounded-full border px-2 py-0.5 text-xs font-medium', STATUS_STYLES[a.status] ?? STATUS_STYLES.prospect)}>
+                  {a.status.charAt(0).toUpperCase() + a.status.slice(1)}
+                </span>
+              </Link>
+              <button onClick={() => handleDelete(a)} disabled={deleting === a.id}
+                className="shrink-0 rounded-lg p-1.5 text-slate-300 opacity-0 transition-all group-hover:opacity-100 hover:bg-red-50 hover:text-red-500">
+                <Trash2 size={15} />
+              </button>
+            </Card>
+          ))}
+        </div>
+      )}
 
-      <Card className="p-6 text-center">
-        <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50">
-          <Building2 size={22} className="text-blue-500" />
-        </div>
-        <h3 className="text-sm font-semibold text-slate-700">CRM module coming soon</h3>
-        <p className="mt-1 text-sm text-slate-400 max-w-sm mx-auto">
-          Track customers, contacts, opportunities, and proposals. Linked to quotes from System Builder.
-        </p>
-        <div className="mt-4 flex justify-center gap-4 text-xs text-slate-400">
-          <span className="flex items-center gap-1"><Building2 size={12} /> Accounts</span>
-          <span className="flex items-center gap-1"><Phone size={12} /> Contacts</span>
-          <span className="flex items-center gap-1"><Mail size={12} /> Opportunities</span>
-        </div>
-      </Card>
+      <NewAccountModal open={modalOpen} onClose={() => setModalOpen(false)} onSave={createAccount} />
     </div>
   );
 }
 
 export default function CRMPage() {
-  return (
-    <AuthGuard>
-      <OSShell>
-        <CRMContent />
-      </OSShell>
-    </AuthGuard>
-  );
+  return <AuthGuard><OSShell><CRMContent /></OSShell></AuthGuard>;
 }
