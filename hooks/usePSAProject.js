@@ -338,6 +338,92 @@ export function usePSAProject(projectId, session) {
     [supabase, projectId, refresh]
   );
 
+  // Clone a milestone (and all its tasks) into the same or a different technology section.
+  const cloneMilestone = useCallback(
+    async (milestoneId, toTechnologyId = null) => {
+      const ms = milestones.find((m) => m.id === milestoneId);
+      if (!ms) return;
+      const msTasks = tasks
+        .filter((t) => t.milestone_id === milestoneId)
+        .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+      const techId = toTechnologyId ?? ms.technology_id;
+      const sort_order = nextSortOrder(milestones.filter((m) => m.technology_id === techId));
+
+      if (!supabase) {
+        const now = new Date().toISOString();
+        const newMs = {
+          id: newPsaId(), project_id: projectId,
+          name: ms.name + ' (copy)', technology_id: techId,
+          start_date: ms.start_date ?? null, due_date: ms.due_date ?? null,
+          sort_order, created_at: now,
+        };
+        const newTasks = msTasks.map((t, i) => ({
+          ...t, id: newPsaId(), milestone_id: newMs.id, technology_id: techId,
+          status: 'todo', sort_order: i * 10, created_at: now,
+        }));
+        writePsa((s) => ({ ...s, milestones: [...s.milestones, newMs], tasks: [...s.tasks, ...newTasks] }));
+        return;
+      }
+
+      const { data: newMs, error: msErr } = await supabase
+        .from('psa_milestones')
+        .insert({
+          project_id: projectId, name: ms.name + ' (copy)', technology_id: techId,
+          start_date: ms.start_date ?? null, due_date: ms.due_date ?? null, sort_order,
+        })
+        .select().single();
+      if (msErr) throw msErr;
+
+      if (msTasks.length > 0) {
+        const { error: tErr } = await supabase.from('psa_tasks').insert(
+          msTasks.map((t, i) => ({
+            project_id: projectId, milestone_id: newMs.id, technology_id: techId,
+            title: t.title, description: t.description ?? null, role: t.role ?? null,
+            estimated_hours: t.estimated_hours ?? null, status: 'todo', sort_order: i * 10,
+          }))
+        );
+        if (tErr) throw tErr;
+      }
+
+      await refresh();
+    },
+    [supabase, projectId, milestones, tasks, refresh]
+  );
+
+  // Clone a single task into the same or a different milestone.
+  const cloneTask = useCallback(
+    async (taskId, toMilestoneId = null) => {
+      const task = tasks.find((t) => t.id === taskId);
+      if (!task) return;
+      const msId = toMilestoneId ?? task.milestone_id;
+      const targetMs = milestones.find((m) => m.id === msId);
+      const techId = targetMs?.technology_id ?? task.technology_id;
+      const sort_order = nextSortOrder(tasks.filter((t) => t.milestone_id === msId));
+
+      if (!supabase) {
+        const now = new Date().toISOString();
+        writePsa((s) => ({
+          ...s,
+          tasks: [...s.tasks, {
+            ...task, id: newPsaId(), milestone_id: msId, technology_id: techId,
+            title: task.title + ' (copy)', status: 'todo', sort_order, created_at: now,
+          }],
+        }));
+        return;
+      }
+
+      const { error } = await supabase.from('psa_tasks').insert({
+        project_id: projectId, milestone_id: msId, technology_id: techId,
+        title: task.title + ' (copy)', description: task.description ?? null,
+        role: task.role ?? null, estimated_hours: task.estimated_hours ?? null,
+        status: 'todo', sort_order,
+      });
+      if (error) throw error;
+      await refresh();
+    },
+    [supabase, projectId, milestones, tasks, refresh]
+  );
+
   // ---- Technologies ----
   const createTechnology = useCallback(
     async (data) => {
@@ -479,6 +565,8 @@ export function usePSAProject(projectId, session) {
     batchUpdateTasks,
     moveMilestoneToSection,
     mergeTechnologies,
+    cloneMilestone,
+    cloneTask,
   };
 }
 

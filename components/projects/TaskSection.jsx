@@ -29,6 +29,7 @@ import {
   User,
   Calendar,
   ArrowRight,
+  Copy,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -192,8 +193,58 @@ function MoveMenu({ label, items, onPick }) {
   );
 }
 
+// ── CloneMenu ─────────────────────────────────────────────────────────────────
+// Dropdown that offers "Clone here" + optional "Clone to [destination]" entries.
+function CloneMenu({ label, onCloneHere, items = [], onCloneTo }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  const handleClick = () => {
+    if (items.length === 0) { onCloneHere(); return; }
+    setOpen((v) => !v);
+  };
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        title={label}
+        onClick={handleClick}
+        className="flex items-center rounded p-1 text-[11px] text-slate-400 hover:bg-slate-100 hover:text-blue-500"
+      >
+        <Copy size={12} />
+      </button>
+      {open && (
+        <div
+          className="absolute right-0 top-full z-30 mt-1 min-w-[170px] rounded-xl border border-slate-200 bg-white p-1 shadow-lg"
+          onMouseLeave={() => setOpen(false)}
+        >
+          <p className="px-2 py-1 text-[10px] uppercase tracking-wide text-slate-400">{label}</p>
+          <button
+            type="button"
+            onClick={() => { onCloneHere(); setOpen(false); }}
+            className="w-full truncate rounded-lg px-2 py-1.5 text-left text-xs text-slate-700 hover:bg-blue-50 hover:text-blue-700"
+          >
+            Clone here
+          </button>
+          {items.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => { onCloneTo(item.id); setOpen(false); }}
+              className="w-full truncate rounded-lg px-2 py-1.5 text-left text-xs text-slate-700 hover:bg-blue-50 hover:text-blue-700"
+            >
+              Clone to {item.name}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── SortableTaskRow ───────────────────────────────────────────────────────────
-function SortableTaskRow({ task, allProjectMilestones, onUpdate, onDelete, onMoveTask, getPalette }) {
+function SortableTaskRow({ task, allProjectMilestones, onUpdate, onDelete, onMoveTask, onCloneTask, getPalette }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id,
     data: { type: 'task', milestoneId: task.milestone_id },
@@ -290,6 +341,14 @@ function SortableTaskRow({ task, allProjectMilestones, onUpdate, onDelete, onMov
             items={otherMilestones.map((m) => ({ id: m.id, name: m.name }))}
             onPick={(toMsId) => onMoveTask(task.id, toMsId)}
           />
+          {onCloneTask && (
+            <CloneMenu
+              label="Copy task"
+              onCloneHere={() => onCloneTask(task.id, task.milestone_id)}
+              items={otherMilestones.map((m) => ({ id: m.id, name: m.name }))}
+              onCloneTo={(toMsId) => onCloneTask(task.id, toMsId)}
+            />
+          )}
           <button
             type="button"
             onClick={() => onDelete(task.id)}
@@ -332,6 +391,8 @@ function SortableMilestoneBlock({
   onMoveTask,
   onCreateTask,
   onMoveMilestoneToSection,
+  onCloneMilestone,
+  onCloneTask,
   getPalette,
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -402,6 +463,14 @@ function SortableMilestoneBlock({
               onPick={(toId) => onMoveMilestoneToSection?.(milestone.id, toId)}
             />
           )}
+          {onCloneMilestone && (
+            <CloneMenu
+              label="Clone phase"
+              onCloneHere={() => onCloneMilestone(milestone.id, milestone.technology_id)}
+              items={otherSections.map((s) => ({ id: s.id, name: s.technology }))}
+              onCloneTo={(toId) => onCloneMilestone(milestone.id, toId)}
+            />
+          )}
           <button
             type="button"
             title="Delete phase"
@@ -428,6 +497,7 @@ function SortableMilestoneBlock({
                 onUpdate={onUpdateTask}
                 onDelete={onDeleteTask}
                 onMoveTask={onMoveTask}
+                onCloneTask={onCloneTask}
                 getPalette={getPalette}
               />
             ))}
@@ -457,6 +527,8 @@ export default function TaskSection({
   onBatchUpdateMilestones,
   onBatchUpdateTasks,
   onMoveMilestoneToSection,
+  onCloneMilestone,
+  onCloneTask,
   getPalette,
 }) {
   const [activeId, setActiveId] = useState(null);
@@ -566,6 +638,8 @@ export default function TaskSection({
                 onMoveTask={handleMoveTask}
                 onCreateTask={onCreateTask}
                 onMoveMilestoneToSection={onMoveMilestoneToSection}
+                onCloneMilestone={onCloneMilestone}
+                onCloneTask={onCloneTask}
                 getPalette={getPalette}
               />
             );
@@ -588,6 +662,7 @@ export default function TaskSection({
                   onUpdate={onUpdateTask}
                   onDelete={onDeleteTask}
                   onMoveTask={handleMoveTask}
+                  onCloneTask={onCloneTask}
                   getPalette={getPalette}
                 />
               ))}

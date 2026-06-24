@@ -132,6 +132,7 @@ function ProjectDetail() {
     createTechnology, updateTechnology, deleteTechnology, applyTemplate,
     batchUpdateMilestones, batchUpdateTasks,
     moveMilestoneToSection, mergeTechnologies,
+    cloneMilestone, cloneTask,
   } = usePSAProject(id, session);
 
   const { allTemplates } = useTemplates(session, company, user);
@@ -184,6 +185,8 @@ function ProjectDetail() {
     onBatchUpdateMilestones: batchUpdateMilestones,
     onBatchUpdateTasks: batchUpdateTasks,
     onMoveMilestoneToSection: moveMilestoneToSection,
+    onCloneMilestone: cloneMilestone,
+    onCloneTask: cloneTask,
     getPalette,
   };
 

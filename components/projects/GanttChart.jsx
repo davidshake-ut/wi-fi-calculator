@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Palette, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PALETTE, PALETTE_MAP } from '@/hooks/useRoleColors';
@@ -27,6 +27,13 @@ const SEC_H   = 32;    // px — section header rows
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function dayOff(dateStr, minDate) {
   return Math.round((new Date(dateStr + 'T00:00:00') - minDate) / DAY_MS);
+}
+
+function addDays(dateStr, days) {
+  if (!dateStr) return null;
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
 }
 
 function fmtShort(iso) {
@@ -131,30 +138,107 @@ function TodayLine({ minDate, totalDays }) {
   );
 }
 
-// ── Bar ───────────────────────────────────────────────────────────────────────
-function Bar({ startDate, dueDate, minDate, barClass, label, thick }) {
-  const hasS = Boolean(startDate);
-  const hasE = Boolean(dueDate);
+// ── DraggableBar ─────────────────────────────────────────────────────────────
+// When onSave is provided, left/right handles resize the bar and the center
+// drags both dates together. Fires onSave(newStart, newEnd) on mouse-up.
+function DraggableBar({ startDate, dueDate, minDate, barClass, label, thick, onSave }) {
+  const [ls, setLs] = useState(startDate);
+  const [le, setLe] = useState(dueDate);
+  const [dragging, setDragging] = useState(false);
+  const curRef = useRef({ start: startDate, end: dueDate });
+  const draggingRef = useRef(false);
+
+  useEffect(() => {
+    if (!draggingRef.current) {
+      setLs(startDate); setLe(dueDate);
+      curRef.current = { start: startDate, end: dueDate };
+    }
+  }, [startDate, dueDate]);
+
+  const hasS = Boolean(ls);
+  const hasE = Boolean(le);
   if (!hasS && !hasE) return null;
 
-  const s = hasS ? dayOff(startDate, minDate) : dayOff(dueDate, minDate);
-  const e = hasE ? dayOff(dueDate, minDate)   : s;
-  const left  = Math.max(0, s) * DAY_PX;
-  const span  = Math.max(0, e - Math.max(0, s));
-  const width = Math.max(DAY_PX, span * DAY_PX);
-  const isPoint = !hasS || !hasE || s === e;
+  const sOff = hasS ? dayOff(ls, minDate) : dayOff(le, minDate);
+  const eOff = hasE ? dayOff(le, minDate) : sOff;
+  const left  = Math.max(0, sOff) * DAY_PX;
+  const width = Math.max(DAY_PX, (Math.max(eOff, sOff) - Math.max(0, sOff)) * DAY_PX);
+  const isPoint = !hasS || !hasE || sOff === eOff;
+
+  const startDrag = (kind) => (evt) => {
+    if (!onSave) return;
+    evt.preventDefault(); evt.stopPropagation();
+    draggingRef.current = true;
+    setDragging(true);
+    const startX = evt.clientX;
+    const origS = curRef.current.start;
+    const origE = curRef.current.end;
+
+    const onMove = (ev) => {
+      const d = Math.round((ev.clientX - startX) / DAY_PX);
+      let ns = origS, ne = origE;
+      if (kind === 'body')  { ns = addDays(origS, d); ne = addDays(origE, d); }
+      else if (kind === 'start' && origS) { ns = addDays(origS, d); if (ne && ns > ne) ns = ne; }
+      else if (kind === 'end'   && origE) { ne = addDays(origE, d); if (ns && ne < ns) ne = ns; }
+      curRef.current = { start: ns, end: ne };
+      setLs(ns); setLe(ne);
+    };
+    const onUp = () => {
+      draggingRef.current = false;
+      setDragging(false);
+      onSave(curRef.current.start, curRef.current.end);
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  };
 
   return (
     <div
+      title={`${label}${ls ? `\nStart: ${ls}` : ''}${le ? `\nDue: ${le}` : ''}`}
       className={cn(
-        'absolute top-1/2 -translate-y-1/2 rounded-full opacity-85',
+        'absolute top-1/2 -translate-y-1/2 group select-none',
         barClass,
         thick ? 'h-4' : 'h-3',
-        isPoint && 'w-3'
+        isPoint ? 'w-3 rounded-full' : 'rounded-full',
+        dragging ? 'opacity-100 shadow-md' : 'opacity-85 hover:opacity-95'
       )}
       style={{ left, width: isPoint ? undefined : width }}
-      title={`${label}${startDate ? `\nStart: ${startDate}` : ''}${dueDate ? `\nDue: ${dueDate}` : ''}`}
-    />
+    >
+      {!isPoint && onSave && (
+        <>
+          {/* Left resize handle */}
+          {hasS && (
+            <div
+              className="absolute left-0 top-0 bottom-0 w-2 cursor-col-resize"
+              onMouseDown={startDrag('start')}
+            >
+              <div className="absolute left-0.5 top-1/2 -translate-y-1/2 h-3/4 w-0.5 rounded-full bg-white/60 opacity-0 group-hover:opacity-100 transition-opacity" />
+            </div>
+          )}
+          {/* Center — move both dates */}
+          <div
+            className={cn(
+              'absolute top-0 bottom-0',
+              hasS ? 'left-2' : 'left-0',
+              hasE ? 'right-2' : 'right-0',
+              dragging ? 'cursor-grabbing' : 'cursor-grab'
+            )}
+            onMouseDown={startDrag('body')}
+          />
+          {/* Right resize handle */}
+          {hasE && (
+            <div
+              className="absolute right-0 top-0 bottom-0 w-2 cursor-col-resize"
+              onMouseDown={startDrag('end')}
+            >
+              <div className="absolute right-0.5 top-1/2 -translate-y-1/2 h-3/4 w-0.5 rounded-full bg-white/60 opacity-0 group-hover:opacity-100 transition-opacity" />
+            </div>
+          )}
+        </>
+      )}
+    </div>
   );
 }
 
@@ -450,17 +534,22 @@ export default function GanttChart({
                   style={{ top, height: h }}
                 >
                   {!isSection && (
-                    <Bar
+                    <DraggableBar
                       startDate={row.item.start_date}
                       dueDate={row.item.due_date}
                       minDate={minDate}
                       barClass={barClass}
                       label={row.item.name ?? row.item.title ?? ''}
                       thick={row.kind === 'milestone'}
+                      onSave={
+                        row.kind === 'milestone'
+                          ? (s, e) => onUpdateMilestone?.(row.item.id, { start_date: s, due_date: e })
+                          : (s, e) => onUpdateTask?.(row.item.id, { start_date: s, due_date: e })
+                      }
                     />
                   )}
                   {isSection && sectionSpan && (
-                    <Bar
+                    <DraggableBar
                       startDate={sectionSpan.startDate}
                       dueDate={sectionSpan.dueDate}
                       minDate={minDate}
