@@ -38,7 +38,7 @@ export function usePSAProjects(session, company, user) {
   }, [supabase, session, refresh]);
 
   const createProject = useCallback(
-    async (data) => {
+    async ({ technologies = [], ...data }) => {
       const now = new Date().toISOString();
       if (!supabase) {
         const proj = {
@@ -49,19 +49,38 @@ export function usePSAProjects(session, company, user) {
           created_at: now,
           updated_at: now,
         };
-        writePsa((s) => ({ ...s, projects: [proj, ...s.projects] }));
+        const techs = technologies.map((technology, i) => ({
+          id: newPsaId(),
+          project_id: proj.id,
+          company_id: 'local',
+          technology,
+          order_index: i,
+          created_at: now,
+        }));
+        writePsa((s) => ({
+          ...s,
+          projects: [proj, ...s.projects],
+          technologies: [...(s.technologies ?? []), ...techs],
+        }));
         return proj;
       }
       const { data: proj, error } = await supabase
         .from('psa_projects')
-        .insert({
-          ...data,
-          company_id: company?.id,
-          created_by: user?.id ?? null,
-        })
+        .insert({ ...data, company_id: company?.id, created_by: user?.id ?? null })
         .select()
         .single();
       if (error) throw error;
+      // Create technology rows after project exists
+      if (technologies.length > 0) {
+        await supabase.from('project_technologies').insert(
+          technologies.map((technology, i) => ({
+            project_id: proj.id,
+            company_id: company?.id,
+            technology,
+            order_index: i,
+          }))
+        );
+      }
       await refresh();
       return proj;
     },

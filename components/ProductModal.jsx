@@ -5,7 +5,7 @@ import { X } from 'lucide-react';
 import { Card, Button, Field, TextInput, NumberInput, Select } from '@/components/ui/primitives';
 import { PRODUCT_CATEGORIES } from '@/lib/catalog';
 
-const EMPTY = { sku: '', description: '', category: 'Access Point', cost: 0, price: 0 };
+const EMPTY = { sku: '', description: '', category: 'Access Point', cost: 0, price: 0, vendor: '' };
 
 // product === null → Add mode; otherwise Edit (SKU locked for base products).
 function initialForm(product) {
@@ -16,6 +16,7 @@ function initialForm(product) {
     category: product.category,
     cost: product.cost,
     price: product.price,
+    vendor: product.vendor ?? '',
   };
 }
 
@@ -88,6 +89,9 @@ export default function ProductModal({ open, product, clone = false, onClose, on
                 </option>
               ))}
             </Select>
+          </Field>
+          <Field label="Preferred Vendor">
+            <TextInput value={form.vendor} onChange={(e) => set('vendor', e.target.value)} placeholder="e.g. Cambium Networks, Vertiv…" />
           </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Cost">

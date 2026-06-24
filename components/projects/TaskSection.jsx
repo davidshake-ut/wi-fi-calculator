@@ -9,6 +9,7 @@ import {
   ChevronRight,
   Trash2,
   Milestone,
+  User,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -100,38 +101,63 @@ function AddInline({ placeholder, onAdd, className }) {
 // ---- Single task row ----
 function TaskRow({ task, onToggle, onRename, onDelete }) {
   const done = task.status === 'done';
+  const hasDetail = task.description || task.role;
+  const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className="group flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-50">
-      <button
-        onClick={() => onToggle(task)}
-        className={cn(
-          'shrink-0 transition-colors',
-          done ? 'text-emerald-500 hover:text-emerald-700' : 'text-slate-300 hover:text-slate-500'
-        )}
-        title={done ? 'Mark as to-do' : 'Mark as done'}
-      >
-        {done ? <CheckCircle2 size={18} /> : <Circle size={18} />}
-      </button>
+    <div className={cn('group rounded-lg hover:bg-slate-50', expanded && 'bg-slate-50')}>
+      <div className="flex items-center gap-2 px-2 py-1.5">
+        <button
+          onClick={() => onToggle(task)}
+          className={cn(
+            'shrink-0 transition-colors',
+            done ? 'text-emerald-500 hover:text-emerald-700' : 'text-slate-300 hover:text-slate-500'
+          )}
+          title={done ? 'Mark as to-do' : 'Mark as done'}
+        >
+          {done ? <CheckCircle2 size={18} /> : <Circle size={18} />}
+        </button>
 
-      <div className="flex-1 min-w-0">
-        <InlineEdit
-          value={task.title}
-          onSave={(v) => onRename(task.id, v)}
-          className={cn('text-sm', done && 'line-through text-slate-400')}
-        />
-        {task.estimated_hours != null && (
-          <span className="ml-2 text-xs text-slate-400">{task.estimated_hours}h est.</span>
+        <div className="flex-1 min-w-0 flex items-center gap-1.5">
+          <InlineEdit
+            value={task.title}
+            onSave={(v) => onRename(task.id, v)}
+            className={cn('text-sm', done && 'line-through text-slate-400')}
+          />
+          {task.role && (
+            <span className="flex items-center gap-0.5 rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500">
+              <User size={10} /> {task.role}
+            </span>
+          )}
+          {task.estimated_hours != null && (
+            <span className="text-xs text-slate-400">{task.estimated_hours}h</span>
+          )}
+        </div>
+
+        {hasDetail && (
+          <button
+            onClick={() => setExpanded((o) => !o)}
+            className="shrink-0 text-slate-300 hover:text-slate-500 transition-colors"
+            title={expanded ? 'Hide details' : 'Show scope of work'}
+          >
+            {expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+          </button>
         )}
+
+        <button
+          onClick={() => onDelete(task.id)}
+          className="shrink-0 rounded p-1 text-slate-300 opacity-0 group-hover:opacity-100 hover:bg-red-50 hover:text-red-500 transition-all"
+          title="Delete task"
+        >
+          <Trash2 size={13} />
+        </button>
       </div>
 
-      <button
-        onClick={() => onDelete(task.id)}
-        className="shrink-0 rounded p-1 text-slate-300 opacity-0 group-hover:opacity-100 hover:bg-red-50 hover:text-red-500 transition-all"
-        title="Delete task"
-      >
-        <Trash2 size={13} />
-      </button>
+      {expanded && task.description && (
+        <div className="border-t border-slate-100 px-10 pb-2 pt-1.5">
+          <p className="text-xs leading-relaxed text-slate-500 whitespace-pre-wrap">{task.description}</p>
+        </div>
+      )}
     </div>
   );
 }

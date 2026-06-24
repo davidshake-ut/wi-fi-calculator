@@ -222,7 +222,10 @@ export default function ProductDatabase({
                     <Badge className="ml-1 border-purple-200 bg-purple-50 text-purple-600">custom</Badge>
                   )}
                 </td>
-                <td className="px-4 py-2 text-slate-700">{p.desc}</td>
+                <td className="px-4 py-2">
+                  <div className="text-slate-700">{p.desc}</div>
+                  {p.vendor && <div className="mt-0.5 text-xs text-slate-400">{p.vendor}</div>}
+                </td>
                 <td className="px-4 py-2">
                   <Badge className="border-slate-200 bg-slate-50 text-slate-500">{p.category}</Badge>
                 </td>

@@ -10,16 +10,22 @@ import {
   Building2,
   Loader2,
   AlertCircle,
+  LayoutTemplate,
+  Plus,
+  Trash2,
 } from 'lucide-react';
 import AuthGuard from '@/components/AuthGuard';
 import OSShell from '@/components/OSShell';
 import { useSession } from '@/components/SessionProvider';
 import { usePSAProject } from '@/hooks/usePSAProject';
+import { useTemplates } from '@/hooks/useTemplates';
 import ProjectStatusBadge, { STATUS_CONFIG } from '@/components/projects/ProjectStatusBadge';
 import TaskSection from '@/components/projects/TaskSection';
 import TimeLog from '@/components/projects/TimeLog';
 import ProjectBudget from '@/components/projects/ProjectBudget';
-import { Select } from '@/components/ui/primitives';
+import ApplyTemplateModal from '@/components/projects/ApplyTemplateModal';
+import { Select, Button } from '@/components/ui/primitives';
+import { TECHNOLOGIES } from '@/lib/templates/index';
 import { cn } from '@/lib/utils';
 
 const TABS = [
@@ -41,12 +47,13 @@ function fmt(n) {
 
 function ProjectDetail() {
   const { id } = useParams();
-  const { session } = useSession();
+  const { session, company, user } = useSession();
   const {
     project,
     milestones,
     tasks,
     timeEntries,
+    technologies,
     loading,
     updateProject,
     createMilestone,
@@ -57,9 +64,16 @@ function ProjectDetail() {
     deleteTask,
     logTime,
     deleteTimeEntry,
+    createTechnology,
+    deleteTechnology,
+    applyTemplate,
   } = usePSAProject(id, session);
 
+  const { allTemplates } = useTemplates(session, company, user);
+
   const [tab, setTab] = useState('tasks');
+  const [applyModal, setApplyModal] = useState(null); // { technology, technologyId }
+  const [addingTech, setAddingTech] = useState(false);
 
   if (loading) {
     return (
@@ -170,15 +184,130 @@ function ProjectDetail() {
       {/* Tab content */}
       <div className="flex-1 p-6">
         {tab === 'tasks' && (
-          <TaskSection
-            milestones={milestones}
-            tasks={tasks}
-            onCreateMilestone={createMilestone}
-            onCreateTask={createTask}
-            onUpdateTask={updateTask}
-            onDeleteTask={deleteTask}
-            onUpdateMilestone={updateMilestone}
-            onDeleteMilestone={deleteMilestone}
+          <div className="space-y-8">
+            {technologies.length === 0 ? (
+              // No technology sections — flat task list (legacy / no tech selected)
+              <TaskSection
+                milestones={milestones}
+                tasks={tasks}
+                onCreateMilestone={createMilestone}
+                onCreateTask={createTask}
+                onUpdateTask={updateTask}
+                onDeleteTask={deleteTask}
+                onUpdateMilestone={updateMilestone}
+                onDeleteMilestone={deleteMilestone}
+              />
+            ) : (
+              technologies.map((tech) => {
+                const techMs    = milestones.filter((m) => m.technology_id === tech.id);
+                const techTasks = tasks.filter((t) => t.technology_id === tech.id);
+                return (
+                  <div key={tech.id}>
+                    <div className="mb-3 flex items-center gap-3">
+                      <span className="rounded-full bg-blue-100 px-3 py-0.5 text-sm font-semibold text-blue-700">
+                        {tech.technology}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setApplyModal({ technology: tech.technology, technologyId: tech.id })}
+                        className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1 text-xs text-slate-500 transition-colors hover:border-blue-300 hover:text-blue-600"
+                      >
+                        <LayoutTemplate size={12} /> Apply Template
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { if (confirm(`Remove the "${tech.technology}" section? Tasks will become unassigned.`)) deleteTechnology(tech.id); }}
+                        className="ml-auto rounded p-1 text-slate-300 hover:text-red-500"
+                        title="Remove section"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                    <TaskSection
+                      milestones={techMs}
+                      tasks={techTasks}
+                      onCreateMilestone={(d) => createMilestone({ ...d, technology_id: tech.id })}
+                      onCreateTask={(d) => createTask({ ...d, technology_id: tech.id })}
+                      onUpdateTask={updateTask}
+                      onDeleteTask={deleteTask}
+                      onUpdateMilestone={updateMilestone}
+                      onDeleteMilestone={deleteMilestone}
+                    />
+                  </div>
+                );
+              })
+            )}
+
+            {/* Unassigned tasks when technologies exist */}
+            {technologies.length > 0 && (() => {
+              const unassignedMs = milestones.filter((m) => !m.technology_id);
+              const unassignedTasks = tasks.filter((t) => !t.technology_id);
+              if (unassignedMs.length === 0 && unassignedTasks.length === 0) return null;
+              return (
+                <div>
+                  <div className="mb-3">
+                    <span className="rounded-full bg-slate-100 px-3 py-0.5 text-sm font-medium text-slate-500">Unassigned</span>
+                  </div>
+                  <TaskSection
+                    milestones={unassignedMs}
+                    tasks={unassignedTasks}
+                    onCreateMilestone={createMilestone}
+                    onCreateTask={createTask}
+                    onUpdateTask={updateTask}
+                    onDeleteTask={deleteTask}
+                    onUpdateMilestone={updateMilestone}
+                    onDeleteMilestone={deleteMilestone}
+                  />
+                </div>
+              );
+            })()}
+
+            {/* Add technology section */}
+            <div>
+              {addingTech ? (
+                <div className="flex flex-wrap gap-2">
+                  {TECHNOLOGIES.filter((t) => !technologies.some((tt) => tt.technology === t)).map((tech) => (
+                    <button
+                      key={tech}
+                      type="button"
+                      onClick={async () => {
+                        await createTechnology({ technology: tech });
+                        setAddingTech(false);
+                      }}
+                      className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-600 hover:border-blue-300 hover:text-blue-700"
+                    >
+                      + {tech}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setAddingTech(false)}
+                    className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-400"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setAddingTech(true)}
+                  className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-blue-600 transition-colors"
+                >
+                  <Plus size={13} /> Add technology section
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {applyModal && (
+          <ApplyTemplateModal
+            open
+            technology={applyModal.technology}
+            templates={allTemplates}
+            projectStartDate={project?.start_date}
+            onApply={(template) => applyTemplate(template, applyModal.technologyId, project?.start_date)}
+            onClose={() => setApplyModal(null)}
           />
         )}
 

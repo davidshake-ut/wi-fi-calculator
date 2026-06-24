@@ -112,7 +112,7 @@ export function useProducts(session, { teamFilter = 'all' } = {}) {
   );
 
   // --- local-mode mutations (mirror the API handlers) ---
-  const addLocal = ({ sku, description, category, cost, price }) => {
+  const addLocal = ({ sku, description, category, cost, price, vendor = '' }) => {
     if (!sku || !description || !category) throw new Error('Missing fields');
     const rows = readLocalArray();
     const existing = rows.find((r) => r.sku === sku);
@@ -126,16 +126,16 @@ export function useProducts(session, { teamFilter = 'all' } = {}) {
     }
     writeLocal([
       ...rows.filter((r) => r.sku !== sku),
-      { sku, description, category, cost: Number(cost), price: Number(price), is_custom: !isBase, is_deleted: false },
+      { sku, description, category, cost: Number(cost), price: Number(price), vendor, is_custom: !isBase, is_deleted: false },
     ]);
   };
 
-  const editLocal = ({ sku, description, category, cost, price }) => {
+  const editLocal = ({ sku, description, category, cost, price, vendor = '' }) => {
     if (!sku) throw new Error('Missing sku');
     const isBase = baseSkus.has(sku);
     writeLocal([
       ...readLocalArray().filter((r) => r.sku !== sku),
-      { sku, description, category, cost: Number(cost), price: Number(price), is_custom: !isBase, is_deleted: false },
+      { sku, description, category, cost: Number(cost), price: Number(price), vendor, is_custom: !isBase, is_deleted: false },
     ]);
   };
 
@@ -166,6 +166,7 @@ export function useProducts(session, { teamFilter = 'all' } = {}) {
         category: r.category,
         cost: Number(r.cost),
         price: Number(r.price),
+        vendor: r.vendor ?? '',
         is_custom: !isBase,
         is_deleted: false,
       });
@@ -186,6 +187,7 @@ export function useProducts(session, { teamFilter = 'all' } = {}) {
         category: r.category,
         cost: Number(r.cost),
         price: Number(r.price),
+        vendor: r.vendor ?? '',
       });
       if (baseSkus.has(r.sku)) updated++;
       else added++;

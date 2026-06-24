@@ -12,6 +12,7 @@ import {
   Shield,
   LogOut,
   Layers,
+  LayoutTemplate,
 } from 'lucide-react';
 import { useSession } from '@/components/SessionProvider';
 import { useModules } from '@/hooks/useModules';
@@ -21,8 +22,9 @@ const NAV_ITEMS = [
   { key: 'dashboard', label: 'Dashboard',       href: '/dashboard', icon: LayoutDashboard },
   { key: 'crm',       label: 'CRM',             href: '/crm',       icon: Users },
   { key: 'builder',   label: 'System Builder',  href: '/builder',   icon: Wrench },
-  { key: 'projects',  label: 'Projects',        href: '/projects',  icon: FolderKanban },
-  { key: 'support',   label: 'Support',         href: '/support',   icon: LifeBuoy },
+  { key: 'projects',   label: 'Projects',        href: '/projects',   icon: FolderKanban },
+  { key: 'templates',  label: 'Templates',       href: '/templates',  icon: LayoutTemplate },
+  { key: 'support',    label: 'Support',         href: '/support',    icon: LifeBuoy },
   { key: 'resources', label: 'Resources',       href: '/resources', icon: BookOpen },
 ];
 
@@ -48,7 +50,9 @@ export default function Sidebar() {
   const { isAdmin, isSuperAdmin, configured, session, signOut } = useSession();
   const { isEnabled } = useModules();
 
-  const visibleItems = NAV_ITEMS.filter((item) => isEnabled(item.key));
+  const visibleItems = NAV_ITEMS.filter((item) =>
+    item.key === 'templates' ? isEnabled('projects') : isEnabled(item.key)
+  );
 
   return (
     <aside className="flex h-screen w-56 shrink-0 flex-col border-r border-slate-200 bg-white">

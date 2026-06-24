@@ -10,39 +10,42 @@ import {
   newPsaId,
 } from '@/lib/psaLocalStore';
 
-// Single project detail: milestones, tasks, time entries, and team members.
+// Single project detail: milestones, tasks, time entries, team members, and technology sections.
 export function usePSAProject(projectId, session) {
   const supabase = getSupabase();
   const localData = useSyncExternalStore(subscribePsa, getPsaSnapshot, getPsaServerSnapshot);
 
-  const [remoteProject,     setRemoteProject]     = useState(null);
-  const [remoteMilestones,  setRemoteMilestones]  = useState([]);
-  const [remoteTasks,       setRemoteTasks]       = useState([]);
-  const [remoteTimeEntries, setRemoteTimeEntries] = useState([]);
-  const [members,           setMembers]           = useState([]);
-  // false by default; set to true/false inside refresh() so no direct setState in useEffect
-  const [loading,           setLoading]           = useState(false);
+  const [remoteProject,        setRemoteProject]        = useState(null);
+  const [remoteMilestones,     setRemoteMilestones]     = useState([]);
+  const [remoteTasks,          setRemoteTasks]          = useState([]);
+  const [remoteTimeEntries,    setRemoteTimeEntries]    = useState([]);
+  const [remoteTechnologies,   setRemoteTechnologies]   = useState([]);
+  const [members,              setMembers]              = useState([]);
+  const [loading,              setLoading]              = useState(false);
 
-  const project     = supabase ? remoteProject     : (localData.projects.find((p) => p.id === projectId) ?? null);
-  const milestones  = supabase ? remoteMilestones  : localData.milestones.filter((m) => m.project_id === projectId).sort((a, b) => a.sort_order - b.sort_order || a.created_at?.localeCompare(b.created_at));
-  const tasks       = supabase ? remoteTasks       : localData.tasks.filter((t) => t.project_id === projectId).sort((a, b) => a.sort_order - b.sort_order || a.created_at?.localeCompare(b.created_at));
-  const timeEntries = supabase ? remoteTimeEntries : localData.time_entries.filter((e) => e.project_id === projectId).sort((a, b) => b.logged_date?.localeCompare(a.logged_date));
+  const project      = supabase ? remoteProject      : (localData.projects.find((p) => p.id === projectId) ?? null);
+  const milestones   = supabase ? remoteMilestones   : localData.milestones.filter((m) => m.project_id === projectId).sort((a, b) => a.sort_order - b.sort_order || a.created_at?.localeCompare(b.created_at));
+  const tasks        = supabase ? remoteTasks        : localData.tasks.filter((t) => t.project_id === projectId).sort((a, b) => a.sort_order - b.sort_order || a.created_at?.localeCompare(b.created_at));
+  const timeEntries  = supabase ? remoteTimeEntries  : localData.time_entries.filter((e) => e.project_id === projectId).sort((a, b) => b.logged_date?.localeCompare(a.logged_date));
+  const technologies = supabase ? remoteTechnologies : (localData.technologies ?? []).filter((t) => t.project_id === projectId).sort((a, b) => a.order_index - b.order_index);
 
   const refresh = useCallback(async () => {
     if (!supabase || !projectId) return;
     setLoading(true);
-    const [projRes, msRes, taskRes, timeRes, memRes] = await Promise.all([
+    const [projRes, msRes, taskRes, timeRes, memRes, techRes] = await Promise.all([
       supabase.from('psa_projects').select('*, saved_projects(project_name)').eq('id', projectId).single(),
       supabase.from('psa_milestones').select('*').eq('project_id', projectId).order('sort_order').order('created_at'),
       supabase.from('psa_tasks').select('*').eq('project_id', projectId).order('sort_order').order('created_at'),
       supabase.from('psa_time_entries').select('*, users(full_name, email)').eq('project_id', projectId).order('logged_date', { ascending: false }).order('created_at', { ascending: false }),
       supabase.from('users').select('id, full_name, email').order('full_name'),
+      supabase.from('project_technologies').select('*').eq('project_id', projectId).order('order_index'),
     ]);
     setRemoteProject(projRes.data ?? null);
     setRemoteMilestones(msRes.data ?? []);
     setRemoteTasks(taskRes.data ?? []);
     setRemoteTimeEntries(timeRes.data ?? []);
     setMembers(memRes.data ?? []);
+    setRemoteTechnologies(techRes.data ?? []);
     setLoading(false);
   }, [supabase, projectId]);
 
@@ -223,11 +226,115 @@ export function usePSAProject(projectId, session) {
     [supabase, refresh]
   );
 
+  // ---- Technologies ----
+  const createTechnology = useCallback(
+    async (data) => {
+      const now = new Date().toISOString();
+      const order_index = technologies.length;
+      if (!supabase) {
+        const tech = { id: newPsaId(), project_id: projectId, company_id: 'local', ...data, order_index, created_at: now };
+        writePsa((s) => ({ ...s, technologies: [...(s.technologies ?? []), tech] }));
+        return tech;
+      }
+      const { data: proj } = await supabase.from('psa_projects').select('company_id').eq('id', projectId).single();
+      const { data: tech, error } = await supabase
+        .from('project_technologies')
+        .insert({ project_id: projectId, company_id: proj?.company_id, ...data, order_index })
+        .select()
+        .single();
+      if (error) throw error;
+      await refresh();
+      return tech;
+    },
+    [supabase, projectId, technologies, refresh]
+  );
+
+  const deleteTechnology = useCallback(
+    async (id) => {
+      if (!supabase) {
+        writePsa((s) => ({ ...s, technologies: (s.technologies ?? []).filter((t) => t.id !== id) }));
+        return;
+      }
+      const { error } = await supabase.from('project_technologies').delete().eq('id', id);
+      if (error) throw error;
+      await refresh();
+    },
+    [supabase, refresh]
+  );
+
+  // Apply a template (system or DB) to a specific technology section.
+  // Creates milestones + tasks scoped to technologyId, with due dates from startDate.
+  const applyTemplate = useCallback(
+    async (template, technologyId, startDate) => {
+      const phases = template.phases ?? [];
+      let dayOffset = 0;
+
+      for (const phase of phases) {
+        const phaseDays = phase.tasks.reduce((sum, t) => sum + Number(t.duration_days ?? 1), 0);
+        const dueDate = startDate
+          ? addBusinessDays(new Date(startDate), dayOffset + phaseDays)
+          : null;
+
+        const sortBase = milestones.filter((m) => m.technology_id === technologyId).length * 10;
+        const sort_order = sortBase + phase.order * 10;
+
+        let milestone;
+        if (!supabase) {
+          const now = new Date().toISOString();
+          milestone = { id: newPsaId(), project_id: projectId, technology_id: technologyId, name: phase.name, sort_order, due_date: dueDate?.toISOString().slice(0, 10) ?? null, created_at: now };
+          writePsa((s) => ({ ...s, milestones: [...s.milestones, milestone] }));
+        } else {
+          const { data: proj } = await supabase.from('psa_projects').select('company_id').eq('id', projectId).single();
+          const { data: ms, error: msErr } = await supabase
+            .from('psa_milestones')
+            .insert({ project_id: projectId, company_id: proj?.company_id, technology_id: technologyId, name: phase.name, sort_order, due_date: dueDate?.toISOString().slice(0, 10) ?? null })
+            .select()
+            .single();
+          if (msErr) throw msErr;
+          milestone = ms;
+        }
+
+        let taskOffset = dayOffset;
+        for (const templateTask of phase.tasks) {
+          const hrs = Number(templateTask.duration_days ?? 1) * 8;
+          const taskSort = templateTask.order * 10;
+
+          if (!supabase) {
+            const now = new Date().toISOString();
+            writePsa((s) => ({
+              ...s,
+              tasks: [...s.tasks, { id: newPsaId(), project_id: projectId, milestone_id: milestone.id, technology_id: technologyId, title: templateTask.name, description: templateTask.description ?? '', role: templateTask.role ?? '', status: 'todo', estimated_hours: hrs, sort_order: taskSort, created_at: now }],
+            }));
+          } else {
+            const { data: proj } = await supabase.from('psa_projects').select('company_id').eq('id', projectId).single();
+            await supabase.from('psa_tasks').insert({
+              project_id: projectId,
+              company_id: proj?.company_id,
+              milestone_id: milestone.id,
+              technology_id: technologyId,
+              title: templateTask.name,
+              description: templateTask.description ?? '',
+              role: templateTask.role ?? '',
+              status: 'todo',
+              estimated_hours: hrs,
+              sort_order: taskSort,
+            });
+          }
+          taskOffset += Number(templateTask.duration_days ?? 1);
+        }
+        dayOffset += phaseDays;
+      }
+      await refresh();
+    },
+    [supabase, projectId, milestones, refresh]
+  );
+
   return {
     project,
     milestones,
     tasks,
     timeEntries,
+    technologies,
     members,
     loading,
     refresh,
@@ -240,5 +347,20 @@ export function usePSAProject(projectId, session) {
     deleteTask,
     logTime,
     deleteTimeEntry,
+    createTechnology,
+    deleteTechnology,
+    applyTemplate,
   };
+}
+
+// Add N business days (Mon-Fri) to a date.
+function addBusinessDays(date, days) {
+  const result = new Date(date);
+  let added = 0;
+  while (added < days) {
+    result.setDate(result.getDate() + 1);
+    const dow = result.getDay();
+    if (dow !== 0 && dow !== 6) added++;
+  }
+  return result;
 }

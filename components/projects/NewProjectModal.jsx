@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { Button, Field, TextInput, Select } from '@/components/ui/primitives';
+import { TECHNOLOGIES } from '@/lib/templates/index';
 
 const EMPTY = {
   name: '',
@@ -13,6 +14,7 @@ const EMPTY = {
   budget: '',
   description: '',
   quote_id: '',
+  technologies: [],
 };
 
 export default function NewProjectModal({ open, onClose, onSave, quotes = [] }) {
@@ -55,6 +57,7 @@ export default function NewProjectModal({ open, onClose, onSave, quotes = [] }) 
         budget: form.budget ? parseFloat(form.budget) : null,
         description: form.description.trim() || null,
         quote_id: form.quote_id || null,
+        technologies: form.technologies,
       });
       onClose();
     } catch (ex) {
@@ -160,6 +163,40 @@ export default function NewProjectModal({ open, onClose, onSave, quotes = [] }) 
                 </Select>
               </Field>
             )}
+
+            <div className="sm:col-span-2">
+              <p className="mb-1.5 text-xs font-medium text-slate-700">Technologies</p>
+              <div className="flex flex-wrap gap-2">
+                {TECHNOLOGIES.map((tech) => {
+                  const checked = form.technologies.includes(tech);
+                  return (
+                    <label
+                      key={tech}
+                      className={`flex cursor-pointer items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm transition-colors ${
+                        checked
+                          ? 'border-blue-400 bg-blue-50 text-blue-700'
+                          : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        className="hidden"
+                        checked={checked}
+                        onChange={() =>
+                          set(
+                            'technologies',
+                            checked
+                              ? form.technologies.filter((t) => t !== tech)
+                              : [...form.technologies, tech]
+                          )
+                        }
+                      />
+                      {tech}
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
 
             <Field label="Description" className="sm:col-span-2">
               <textarea
