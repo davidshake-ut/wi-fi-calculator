@@ -33,24 +33,20 @@ await sql(`
   )
 `);
 
-// Bootstrap: if tracking table is empty but psa_projects already exists,
-// the earlier migrations were applied before tracking was set up — seed them now.
-const countRows = await sql('select count(*)::int as n from public._migrations');
-if (countRows[0].n === 0) {
-  const proofRows = await sql(
-    "select 1 from information_schema.tables where table_schema='public' and table_name='psa_projects'"
-  );
-  if (proofRows.length > 0) {
-    const alreadyApplied = [
-      '0001_init.sql','0002_camera_inputs.sql','0003_custom_line_items.sql',
-      '0004_multitenant.sql','0005_labor_roles.sql','0006_modules.sql',
-      '0007_psa_projects.sql','0008_fix_company_cascade.sql',
-      '0009_crm.sql','0010_support.sql','0011_resources.sql',
-    ];
-    const values = alreadyApplied.map((n) => `('${n}')`).join(',');
-    await sql(`insert into public._migrations (name) values ${values} on conflict do nothing`);
-    console.log(`  bootstrap: seeded ${alreadyApplied.length} pre-existing migrations into tracking table`);
-  }
+// Bootstrap: if psa_projects already exists in the DB, those migrations ran before
+// tracking was set up. Seed them unconditionally; ON CONFLICT DO NOTHING is safe.
+const proofRows = await sql(
+  "select 1 from information_schema.tables where table_schema='public' and table_name='psa_projects'"
+);
+if (proofRows.length > 0) {
+  const alreadyApplied = [
+    '0001_init.sql','0002_camera_inputs.sql','0003_custom_line_items.sql',
+    '0004_multitenant.sql','0005_labor_roles.sql','0006_modules.sql',
+    '0007_psa_projects.sql','0008_fix_company_cascade.sql',
+    '0009_crm.sql','0010_support.sql','0011_resources.sql',
+  ];
+  const values = alreadyApplied.map((n) => `('${n}')`).join(',');
+  await sql(`insert into public._migrations (name) values ${values} on conflict do nothing`);
 }
 
 // Find which migrations have already been applied
