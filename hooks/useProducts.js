@@ -112,30 +112,27 @@ export function useProducts(session, { teamFilter = 'all' } = {}) {
   );
 
   // --- local-mode mutations (mirror the API handlers) ---
-  const addLocal = ({ sku, description, category, cost, price, vendor = '' }) => {
+  const addLocal = ({ sku, description, category, cost, price, vendor = '', preferred_vendor = '' }) => {
     if (!sku || !description || !category) throw new Error('Missing fields');
     const rows = readLocalArray();
     const existing = rows.find((r) => r.sku === sku);
     const isBase = baseSkus.has(sku);
-    // Reject only SKUs that are currently live: a base product with no override,
-    // or any active row. A previously-deleted product (soft-deleted override)
-    // can be re-added — it revives the row instead of erroring.
     const liveBase = isBase && !existing;
     if (liveBase || (existing && !existing.is_deleted)) {
       throw new Error(`SKU ${sku} already exists`);
     }
     writeLocal([
       ...rows.filter((r) => r.sku !== sku),
-      { sku, description, category, cost: Number(cost), price: Number(price), vendor, is_custom: !isBase, is_deleted: false },
+      { sku, description, category, cost: Number(cost), price: Number(price), vendor, preferred_vendor, is_custom: !isBase, is_deleted: false },
     ]);
   };
 
-  const editLocal = ({ sku, description, category, cost, price, vendor = '' }) => {
+  const editLocal = ({ sku, description, category, cost, price, vendor = '', preferred_vendor = '' }) => {
     if (!sku) throw new Error('Missing sku');
     const isBase = baseSkus.has(sku);
     writeLocal([
       ...readLocalArray().filter((r) => r.sku !== sku),
-      { sku, description, category, cost: Number(cost), price: Number(price), vendor, is_custom: !isBase, is_deleted: false },
+      { sku, description, category, cost: Number(cost), price: Number(price), vendor, preferred_vendor, is_custom: !isBase, is_deleted: false },
     ]);
   };
 
@@ -167,6 +164,7 @@ export function useProducts(session, { teamFilter = 'all' } = {}) {
         cost: Number(r.cost),
         price: Number(r.price),
         vendor: r.vendor ?? '',
+        preferred_vendor: r.preferred_vendor ?? '',
         is_custom: !isBase,
         is_deleted: false,
       });
@@ -188,6 +186,7 @@ export function useProducts(session, { teamFilter = 'all' } = {}) {
         cost: Number(r.cost),
         price: Number(r.price),
         vendor: r.vendor ?? '',
+        preferred_vendor: r.preferred_vendor ?? '',
       });
       if (baseSkus.has(r.sku)) updated++;
       else added++;

@@ -105,6 +105,7 @@ export function useProjects(session, company, user) {
         Array.isArray(project.labor_roles) && project.labor_roles.length
           ? project.labor_roles
           : DEFAULT_LABOR_ROLES,
+      crmAccountId: project.crm_account_id ?? null,
     };
   }, []);
 
@@ -118,6 +119,7 @@ export function useProjects(session, company, user) {
       serviceOverrides,
       customLineItems,
       laborRoles,
+      crmAccountId = null,
     }) => {
       if (!supabase) {
         const now = new Date().toISOString();
@@ -135,6 +137,7 @@ export function useProjects(session, company, user) {
             service_overrides: serviceOverrides,
             custom_line_items: customLineItems,
             labor_roles: laborRoles,
+            crm_account_id: crmAccountId,
             updated_at: now,
           };
           if (idx >= 0) list[idx] = saved;
@@ -149,6 +152,7 @@ export function useProjects(session, company, user) {
             service_overrides: serviceOverrides,
             custom_line_items: customLineItems,
             labor_roles: laborRoles,
+            crm_account_id: crmAccountId,
             created_at: now,
             updated_at: now,
           };
@@ -166,6 +170,7 @@ export function useProjects(session, company, user) {
         service_overrides: serviceOverrides,
         custom_line_items: customLineItems,
         labor_roles: laborRoles,
+        crm_account_id: crmAccountId,
         company_id: company?.id ?? null,
         updated_at: new Date().toISOString(),
       };

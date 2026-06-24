@@ -225,6 +225,9 @@ export default function ProductDatabase({
                 <td className="px-4 py-2">
                   <div className="text-slate-700">{p.desc}</div>
                   {p.vendor && <div className="mt-0.5 text-xs text-slate-400">{p.vendor}</div>}
+                  {p.preferred_vendor && (
+                    <div className="mt-0.5 text-xs text-slate-400">via {p.preferred_vendor}</div>
+                  )}
                 </td>
                 <td className="px-4 py-2">
                   <Badge className="border-slate-200 bg-slate-50 text-slate-500">{p.category}</Badge>

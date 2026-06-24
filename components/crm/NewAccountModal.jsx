@@ -85,7 +85,7 @@ export default function NewAccountModal({ open, onClose, onSave }) {
               <TextInput type="tel" value={form.phone} onChange={(e) => set('phone', e.target.value)} placeholder="(555) 000-0000" />
             </Field>
             <Field label="Website">
-              <TextInput type="url" value={form.website} onChange={(e) => set('website', e.target.value)} placeholder="https://example.com" />
+              <TextInput value={form.website} onChange={(e) => set('website', e.target.value)} placeholder="https://example.com" />
             </Field>
             <Field label="Address" className="sm:col-span-2">
               <TextInput value={form.address} onChange={(e) => set('address', e.target.value)} placeholder="123 Main St, City, ST 00000" />

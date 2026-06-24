@@ -25,6 +25,7 @@ import { calculateLabor } from '@/lib/calculateLabor';
 import { estimateLaborHours } from '@/lib/estimateLaborHours';
 import { useProducts } from '@/hooks/useProducts';
 import { useProjects } from '@/hooks/useProjects';
+import { useCRMAccounts } from '@/hooks/useCRMAccounts';
 import { DEFAULT_INPUTS, DEFAULT_CAMERA_INPUTS, DEFAULT_LABOR_ROLES } from '@/lib/defaults';
 import { getTerminology } from '@/lib/terminology';
 import { exportPDF, wifiKpis, cameraKpis } from '@/lib/exportPDF';
@@ -59,6 +60,7 @@ function Calculator() {
   const [modal, setModal] = useState({ open: false, product: null });
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [currentCrmAccountId, setCurrentCrmAccountId] = useState(null);
 
   const [catalogTeamId, setCatalogTeamId] = useState('all');
   const [teams, setTeams] = useState([]);
@@ -73,6 +75,7 @@ function Calculator() {
   }, [isSuperAdmin, session]);
 
   const { branding, setBranding } = useBranding({ configured, company, onSaved: refresh });
+  const { accounts: crmAccounts, createAccount: createCrmAccount } = useCRMAccounts(session, company, user);
   const { allProducts, addProduct, editProduct, deleteProduct, importProducts } = useProducts(
     session,
     { teamFilter: catalogTeamId }
@@ -190,12 +193,14 @@ function Calculator() {
       setCustomLineItems([]);
       setLaborRoles(DEFAULT_LABOR_ROLES);
       setCurrentProjectId(null);
+      setCurrentCrmAccountId(null);
       setSavedSnapshot(null);
       return;
     }
     const project = projects.find((p) => p.id === id);
     if (!project) return;
     const loaded = loadProject(project);
+    setCurrentCrmAccountId(loaded.crmAccountId ?? null);
     setInputs(loaded.inputs);
     setCameraInputs(loaded.cameraInputs);
     setPriceOverrides(loaded.priceOverrides);
@@ -222,6 +227,7 @@ function Calculator() {
         serviceOverrides,
         customLineItems,
         laborRoles,
+        crmAccountId: currentCrmAccountId,
       });
       setCurrentProjectId(saved.id);
       setSavedSnapshot({
@@ -347,6 +353,10 @@ function Calculator() {
               inputs={inputs}
               setInputs={setInputs}
               term={term}
+              crmAccounts={crmAccounts}
+              crmAccountId={currentCrmAccountId}
+              onSelectAccount={setCurrentCrmAccountId}
+              onCreateAccount={createCrmAccount}
               projects={projects}
               currentProjectId={currentProjectId}
               onSelectProject={selectProject}

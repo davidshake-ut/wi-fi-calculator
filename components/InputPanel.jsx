@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { ChevronDown, FolderOpen, Plus } from 'lucide-react';
+import { ChevronDown, FolderOpen, Plus, User, X } from 'lucide-react';
 import {
   Card,
   Field,
@@ -111,6 +111,144 @@ function ProjectNameField({ value, onChange, projects, currentProjectId, onSelec
   );
 }
 
+// ---- Customer picker ----
+const ACCOUNT_TYPES = [
+  { value: 'hospitality', label: 'Hospitality' },
+  { value: 'multi_family', label: 'Multi-Family' },
+  { value: 'senior_living', label: 'Senior Living' },
+  { value: 'education', label: 'Education' },
+  { value: 'healthcare', label: 'Healthcare' },
+  { value: 'other', label: 'Other' },
+];
+
+function CustomerPicker({ accounts = [], crmAccountId, onSelectAccount, onCreateAccount }) {
+  const [open, setOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newType, setNewType] = useState('other');
+  const [busy, setBusy] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDocClick = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, [open]);
+
+  const selected = accounts.find((a) => a.id === crmAccountId);
+
+  const handleCreate = async () => {
+    if (!newName.trim()) return;
+    setBusy(true);
+    try {
+      const acct = await onCreateAccount({ name: newName.trim(), type: newType });
+      onSelectAccount(acct.id);
+      setCreating(false);
+      setNewName('');
+      setNewType('other');
+      setOpen(false);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => { setOpen((o) => !o); setCreating(false); }}
+        className="flex h-9 w-full items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm shadow-sm transition-colors hover:border-slate-300"
+      >
+        <User size={14} className="shrink-0 text-slate-400" />
+        <span className={cn('flex-1 truncate text-left', selected ? 'text-slate-900' : 'text-slate-400')}>
+          {selected ? selected.name : 'Select or create customer…'}
+        </span>
+        {selected ? (
+          <X
+            size={13}
+            className="shrink-0 text-slate-400 hover:text-slate-600"
+            onClick={(e) => { e.stopPropagation(); onSelectAccount(null); }}
+          />
+        ) : (
+          <ChevronDown size={14} className={cn('shrink-0 text-slate-400 transition-transform', open && 'rotate-180')} />
+        )}
+      </button>
+
+      {open && (
+        <div className="absolute left-0 right-0 z-30 mt-1.5 max-h-72 overflow-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg shadow-slate-900/10">
+          {/* Create new inline */}
+          {creating ? (
+            <div className="space-y-2 p-2">
+              <input
+                autoFocus
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleCreate(); if (e.key === 'Escape') setCreating(false); }}
+                placeholder="Customer name…"
+                className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20"
+              />
+              <select
+                value={newType}
+                onChange={(e) => setNewType(e.target.value)}
+                className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-blue-400"
+              >
+                {ACCOUNT_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+              </select>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleCreate}
+                  disabled={!newName.trim() || busy}
+                  className="flex-1 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50 hover:bg-blue-700"
+                >
+                  {busy ? 'Saving…' : 'Create'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCreating(false)}
+                  className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-500 hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={() => setCreating(true)}
+                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm text-blue-600 transition-colors hover:bg-blue-50"
+              >
+                <Plus size={14} /> New customer
+              </button>
+              {accounts.length > 0 && <div className="my-1 h-px bg-slate-100" />}
+              {accounts.map((a) => (
+                <button
+                  key={a.id}
+                  type="button"
+                  onClick={() => { onSelectAccount(a.id); setOpen(false); }}
+                  className={cn(
+                    'flex w-full items-center gap-2 truncate rounded-lg px-2.5 py-2 text-left text-sm transition-colors hover:bg-slate-100',
+                    a.id === crmAccountId ? 'bg-blue-50 font-medium text-blue-700' : 'text-slate-700'
+                  )}
+                >
+                  <User size={13} className="shrink-0 text-slate-400" />
+                  <span className="truncate">{a.name}</span>
+                  <span className="ml-auto shrink-0 text-[10px] uppercase tracking-wide text-slate-400">{a.type?.replace('_', ' ')}</span>
+                </button>
+              ))}
+              {accounts.length === 0 && (
+                <p className="px-2.5 py-2 text-xs text-slate-400">No customers yet — create one above.</p>
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function InputPanel({
   inputs,
   setInputs,
@@ -118,6 +256,10 @@ export default function InputPanel({
   projects = [],
   currentProjectId = null,
   onSelectProject = () => {},
+  crmAccounts = [],
+  crmAccountId = null,
+  onSelectAccount = () => {},
+  onCreateAccount = async () => {},
 }) {
   const set = (field, value) => setInputs((prev) => ({ ...prev, [field]: value }));
 
@@ -134,6 +276,14 @@ export default function InputPanel({
   return (
     <div className="space-y-3">
       <Section title="Property Information">
+        <Field label="Customer">
+          <CustomerPicker
+            accounts={crmAccounts}
+            crmAccountId={crmAccountId}
+            onSelectAccount={onSelectAccount}
+            onCreateAccount={onCreateAccount}
+          />
+        </Field>
         <Field label="Project / Property Name">
           <ProjectNameField
             value={inputs.propertyName}
