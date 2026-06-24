@@ -6,6 +6,8 @@ on:
       - main
     paths:
       - 'supabase/migrations/**'
+      - 'scripts/migrate.mjs'
+  workflow_dispatch:
 
 jobs:
   migrate:
