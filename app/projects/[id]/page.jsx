@@ -4,15 +4,8 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import {
-  ArrowLeft,
-  Calendar,
-  DollarSign,
-  Building2,
-  Loader2,
-  AlertCircle,
-  LayoutTemplate,
-  Plus,
-  Trash2,
+  ArrowLeft, Calendar, DollarSign, Building2, Loader2, AlertCircle,
+  LayoutTemplate, Plus, Trash2, ChevronDown, ChevronRight, GitMerge,
 } from 'lucide-react';
 import AuthGuard from '@/components/AuthGuard';
 import OSShell from '@/components/OSShell';
@@ -21,6 +14,7 @@ import { usePSAProject } from '@/hooks/usePSAProject';
 import { useTemplates } from '@/hooks/useTemplates';
 import ProjectStatusBadge, { STATUS_CONFIG } from '@/components/projects/ProjectStatusBadge';
 import TaskSection from '@/components/projects/TaskSection';
+import GanttChart from '@/components/projects/GanttChart';
 import TimeLog from '@/components/projects/TimeLog';
 import ProjectBudget from '@/components/projects/ProjectBudget';
 import ApplyTemplateModal from '@/components/projects/ApplyTemplateModal';
@@ -30,6 +24,7 @@ import { cn } from '@/lib/utils';
 
 const TABS = [
   { id: 'tasks',    label: 'Tasks'    },
+  { id: 'gantt',   label: 'Gantt'    },
   { id: 'time',     label: 'Time Log' },
   { id: 'budget',   label: 'Budget'   },
   { id: 'overview', label: 'Overview' },
@@ -45,35 +40,74 @@ function fmt(n) {
   return `$${Number(n).toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
 }
 
+// Small inline dropdown for "Merge into another section"
+function MergeMenu({ tech, others, onMerge }) {
+  const [open, setOpen] = useState(false);
+  if (others.length === 0) return null;
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        title="Merge into another section"
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-500 transition-colors hover:border-orange-300 hover:text-orange-600"
+      >
+        <GitMerge size={11} /> Merge into…
+      </button>
+      {open && (
+        <div
+          className="absolute left-0 top-full z-30 mt-1 min-w-[160px] rounded-xl border border-slate-200 bg-white p-1 shadow-lg"
+          onMouseLeave={() => setOpen(false)}
+        >
+          <p className="px-2 py-1 text-[10px] uppercase tracking-wide text-slate-400">Move into</p>
+          {others.map((o) => (
+            <button
+              key={o.id}
+              type="button"
+              onClick={() => {
+                if (confirm(`Merge "${tech.technology}" into "${o.technology}"? All phases and tasks will move.`)) {
+                  onMerge(tech.id, o.id);
+                  setOpen(false);
+                }
+              }}
+              className="w-full truncate rounded-lg px-2 py-1.5 text-left text-xs text-slate-700 hover:bg-slate-100"
+            >
+              {o.technology}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ProjectDetail() {
   const { id } = useParams();
   const { session, company, user } = useSession();
   const {
-    project,
-    milestones,
-    tasks,
-    timeEntries,
-    technologies,
-    loading,
+    project, milestones, tasks, timeEntries, technologies, loading,
     updateProject,
-    createMilestone,
-    updateMilestone,
-    deleteMilestone,
-    createTask,
-    updateTask,
-    deleteTask,
-    logTime,
-    deleteTimeEntry,
-    createTechnology,
-    deleteTechnology,
-    applyTemplate,
+    createMilestone, updateMilestone, deleteMilestone,
+    createTask, updateTask, deleteTask,
+    logTime, deleteTimeEntry,
+    createTechnology, deleteTechnology, applyTemplate,
+    batchUpdateMilestones, batchUpdateTasks,
+    moveMilestoneToSection, mergeTechnologies,
   } = usePSAProject(id, session);
 
   const { allTemplates } = useTemplates(session, company, user);
 
   const [tab, setTab] = useState('tasks');
-  const [applyModal, setApplyModal] = useState(null); // { technology, technologyId }
+  const [applyModal, setApplyModal] = useState(null);
   const [addingTech, setAddingTech] = useState(false);
+  const [collapsedTechs, setCollapsedTechs] = useState(new Set());
+
+  const toggleTech = (techId) =>
+    setCollapsedTechs((prev) => {
+      const next = new Set(prev);
+      if (next.has(techId)) next.delete(techId); else next.add(techId);
+      return next;
+    });
 
   if (loading) {
     return (
@@ -88,9 +122,7 @@ function ProjectDetail() {
       <div className="flex h-64 flex-col items-center justify-center gap-3 text-slate-500">
         <AlertCircle size={28} className="text-slate-300" />
         <p className="text-sm">Project not found.</p>
-        <Link href="/projects" className="text-sm text-blue-600 hover:underline">
-          ← Back to Projects
-        </Link>
+        <Link href="/projects" className="text-sm text-blue-600 hover:underline">← Back to Projects</Link>
       </div>
     );
   }
@@ -100,25 +132,33 @@ function ProjectDetail() {
   const pct        = tasksTotal > 0 ? Math.round((tasksDone / tasksTotal) * 100) : 0;
   const totalHours = timeEntries.reduce((sum, e) => sum + (parseFloat(e.hours) || 0), 0);
 
+  // Shared TaskSection props
+  const sharedTaskSectionProps = {
+    allProjectMilestones: milestones,
+    techSections: technologies,
+    onUpdateTask: updateTask,
+    onDeleteTask: deleteTask,
+    onUpdateMilestone: updateMilestone,
+    onDeleteMilestone: deleteMilestone,
+    onBatchUpdateMilestones: batchUpdateMilestones,
+    onBatchUpdateTasks: batchUpdateTasks,
+    onMoveMilestoneToSection: moveMilestoneToSection,
+  };
+
   return (
-    <div className="flex flex-col min-h-full">
+    <div className="flex min-h-full flex-col">
       {/* Project header */}
       <div className="border-b border-slate-200 bg-white px-6 py-4">
-        <Link
-          href="/projects"
-          className="mb-3 flex items-center gap-1 text-xs text-slate-400 hover:text-blue-600"
-        >
+        <Link href="/projects" className="mb-3 flex items-center gap-1 text-xs text-slate-400 hover:text-blue-600">
           <ArrowLeft size={13} /> Projects
         </Link>
 
         <div className="flex flex-wrap items-start gap-4">
-          <div className="flex-1 min-w-0">
+          <div className="min-w-0 flex-1">
             <h1 className="truncate text-lg font-bold text-slate-900">{project.name}</h1>
             <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-slate-500">
               {project.customer_name && (
-                <span className="flex items-center gap-1">
-                  <Building2 size={12} /> {project.customer_name}
-                </span>
+                <span className="flex items-center gap-1"><Building2 size={12} /> {project.customer_name}</span>
               )}
               {(project.start_date || project.end_date) && (
                 <span className="flex items-center gap-1">
@@ -127,14 +167,11 @@ function ProjectDetail() {
                 </span>
               )}
               {project.budget && (
-                <span className="flex items-center gap-1">
-                  <DollarSign size={12} /> {fmt(project.budget)}
-                </span>
+                <span className="flex items-center gap-1"><DollarSign size={12} /> {fmt(project.budget)}</span>
               )}
             </div>
           </div>
 
-          {/* Status selector */}
           <Select
             className="h-8 w-36 text-xs"
             value={project.status}
@@ -146,7 +183,6 @@ function ProjectDetail() {
           </Select>
         </div>
 
-        {/* Progress bar */}
         {tasksTotal > 0 && (
           <div className="mt-3">
             <div className="mb-1 flex items-center justify-between text-xs text-slate-400">
@@ -154,15 +190,11 @@ function ProjectDetail() {
               <span>{pct}% · {totalHours.toFixed(1)}h logged</span>
             </div>
             <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
-              <div
-                className="h-full rounded-full bg-blue-500 transition-all"
-                style={{ width: `${pct}%` }}
-              />
+              <div className="h-full rounded-full bg-blue-500 transition-all" style={{ width: `${pct}%` }} />
             </div>
           </div>
         )}
 
-        {/* Tab strip */}
         <div className="mt-4 flex gap-1">
           {TABS.map((t) => (
             <button
@@ -170,9 +202,7 @@ function ProjectDetail() {
               onClick={() => setTab(t.id)}
               className={cn(
                 'rounded-lg px-3 py-1.5 text-sm font-medium transition-all',
-                tab === t.id
-                  ? 'bg-blue-50 text-blue-700'
-                  : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
+                tab === t.id ? 'bg-blue-50 text-blue-700' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
               )}
             >
               {t.label}
@@ -183,30 +213,47 @@ function ProjectDetail() {
 
       {/* Tab content */}
       <div className="flex-1 p-6">
+
+        {/* ── Tasks ── */}
         {tab === 'tasks' && (
-          <div className="space-y-8">
+          <div className="space-y-6">
             {technologies.length === 0 ? (
-              // No technology sections — flat task list (legacy / no tech selected)
               <TaskSection
                 milestones={milestones}
                 tasks={tasks}
                 onCreateMilestone={createMilestone}
                 onCreateTask={createTask}
-                onUpdateTask={updateTask}
-                onDeleteTask={deleteTask}
-                onUpdateMilestone={updateMilestone}
-                onDeleteMilestone={deleteMilestone}
+                {...sharedTaskSectionProps}
               />
             ) : (
               technologies.map((tech) => {
                 const techMs    = milestones.filter((m) => m.technology_id === tech.id);
                 const techTasks = tasks.filter((t) => t.technology_id === tech.id);
+                const collapsed = collapsedTechs.has(tech.id);
+                const others    = technologies.filter((t) => t.id !== tech.id);
+
                 return (
                   <div key={tech.id}>
-                    <div className="mb-3 flex items-center gap-3">
+                    {/* Technology section header */}
+                    <div className="mb-3 flex flex-wrap items-center gap-2">
+                      {/* Collapse toggle */}
+                      <button
+                        type="button"
+                        onClick={() => toggleTech(tech.id)}
+                        className="rounded p-0.5 text-slate-400 hover:text-slate-600 transition-colors"
+                      >
+                        {collapsed ? <ChevronRight size={15} /> : <ChevronDown size={15} />}
+                      </button>
+
+                      {/* Tech badge */}
                       <span className="rounded-full bg-blue-100 px-3 py-0.5 text-sm font-semibold text-blue-700">
                         {tech.technology}
                       </span>
+                      <span className="text-xs text-slate-400">
+                        {techMs.length} phase{techMs.length !== 1 ? 's' : ''} · {techTasks.length} task{techTasks.length !== 1 ? 's' : ''}
+                      </span>
+
+                      {/* Apply template */}
                       <button
                         type="button"
                         onClick={() => setApplyModal({ technology: tech.technology, technologyId: tech.id })}
@@ -214,49 +261,58 @@ function ProjectDetail() {
                       >
                         <LayoutTemplate size={12} /> Apply Template
                       </button>
+
+                      {/* Merge into */}
+                      <MergeMenu
+                        tech={tech}
+                        others={others}
+                        onMerge={mergeTechnologies}
+                      />
+
+                      {/* Remove section */}
                       <button
                         type="button"
-                        onClick={() => { if (confirm(`Remove the "${tech.technology}" section? Tasks will become unassigned.`)) deleteTechnology(tech.id); }}
-                        className="ml-auto rounded p-1 text-slate-300 hover:text-red-500"
+                        onClick={() => {
+                          if (confirm(`Remove the "${tech.technology}" section? Tasks will become unassigned.`))
+                            deleteTechnology(tech.id);
+                        }}
+                        className="ml-auto rounded p-1 text-slate-300 hover:text-red-500 transition-colors"
                         title="Remove section"
                       >
                         <Trash2 size={13} />
                       </button>
                     </div>
-                    <TaskSection
-                      milestones={techMs}
-                      tasks={techTasks}
-                      onCreateMilestone={(d) => createMilestone({ ...d, technology_id: tech.id })}
-                      onCreateTask={(d) => createTask({ ...d, technology_id: tech.id })}
-                      onUpdateTask={updateTask}
-                      onDeleteTask={deleteTask}
-                      onUpdateMilestone={updateMilestone}
-                      onDeleteMilestone={deleteMilestone}
-                    />
+
+                    {!collapsed && (
+                      <TaskSection
+                        milestones={techMs}
+                        tasks={techTasks}
+                        onCreateMilestone={(d) => createMilestone({ ...d, technology_id: tech.id })}
+                        onCreateTask={(d) => createTask({ ...d, technology_id: tech.id })}
+                        {...sharedTaskSectionProps}
+                      />
+                    )}
                   </div>
                 );
               })
             )}
 
-            {/* Unassigned tasks when technologies exist */}
+            {/* Unassigned */}
             {technologies.length > 0 && (() => {
-              const unassignedMs = milestones.filter((m) => !m.technology_id);
-              const unassignedTasks = tasks.filter((t) => !t.technology_id);
-              if (unassignedMs.length === 0 && unassignedTasks.length === 0) return null;
+              const unassMs    = milestones.filter((m) => !m.technology_id);
+              const unassTasks = tasks.filter((t) => !t.technology_id);
+              if (unassMs.length === 0 && unassTasks.length === 0) return null;
               return (
                 <div>
                   <div className="mb-3">
                     <span className="rounded-full bg-slate-100 px-3 py-0.5 text-sm font-medium text-slate-500">Unassigned</span>
                   </div>
                   <TaskSection
-                    milestones={unassignedMs}
-                    tasks={unassignedTasks}
+                    milestones={unassMs}
+                    tasks={unassTasks}
                     onCreateMilestone={createMilestone}
                     onCreateTask={createTask}
-                    onUpdateTask={updateTask}
-                    onDeleteTask={deleteTask}
-                    onUpdateMilestone={updateMilestone}
-                    onDeleteMilestone={deleteMilestone}
+                    {...sharedTaskSectionProps}
                   />
                 </div>
               );
@@ -270,10 +326,7 @@ function ProjectDetail() {
                     <button
                       key={tech}
                       type="button"
-                      onClick={async () => {
-                        await createTechnology({ technology: tech });
-                        setAddingTech(false);
-                      }}
+                      onClick={async () => { await createTechnology({ technology: tech }); setAddingTech(false); }}
                       className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-600 hover:border-blue-300 hover:text-blue-700"
                     >
                       + {tech}
@@ -291,7 +344,7 @@ function ProjectDetail() {
                 <button
                   type="button"
                   onClick={() => setAddingTech(true)}
-                  className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-blue-600 transition-colors"
+                  className="flex items-center gap-1.5 text-xs text-slate-400 transition-colors hover:text-blue-600"
                 >
                   <Plus size={13} /> Add technology section
                 </button>
@@ -300,6 +353,16 @@ function ProjectDetail() {
           </div>
         )}
 
+        {/* ── Gantt ── */}
+        {tab === 'gantt' && (
+          <GanttChart
+            technologies={technologies}
+            milestones={milestones}
+            tasks={tasks}
+          />
+        )}
+
+        {/* ── Apply template modal (renders above other tabs) ── */}
         {applyModal && (
           <ApplyTemplateModal
             open
@@ -311,25 +374,19 @@ function ProjectDetail() {
           />
         )}
 
+        {/* ── Time Log ── */}
         {tab === 'time' && (
-          <TimeLog
-            tasks={tasks}
-            timeEntries={timeEntries}
-            onLog={logTime}
-            onDelete={deleteTimeEntry}
-          />
+          <TimeLog tasks={tasks} timeEntries={timeEntries} onLog={logTime} onDelete={deleteTimeEntry} />
         )}
 
+        {/* ── Budget ── */}
         {tab === 'budget' && (
           <div className="max-w-lg">
-            <ProjectBudget
-              project={project}
-              tasks={tasks}
-              timeEntries={timeEntries}
-            />
+            <ProjectBudget project={project} tasks={tasks} timeEntries={timeEntries} />
           </div>
         )}
 
+        {/* ── Overview ── */}
         {tab === 'overview' && (
           <div className="max-w-lg space-y-4">
             <div className="rounded-xl border border-slate-200 bg-white p-5">
@@ -383,7 +440,7 @@ function ProjectDetail() {
             {project.description && (
               <div className="rounded-xl border border-slate-200 bg-white p-5">
                 <h2 className="mb-2 text-sm font-semibold text-slate-700">Description</h2>
-                <p className="text-sm text-slate-600 whitespace-pre-wrap">{project.description}</p>
+                <p className="whitespace-pre-wrap text-sm text-slate-600">{project.description}</p>
               </div>
             )}
           </div>

@@ -2,301 +2,603 @@
 
 import { useRef, useState } from 'react';
 import {
-  Plus,
-  Circle,
+  DndContext,
+  DragOverlay,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  arrayMove,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import {
+  GripVertical,
   CheckCircle2,
+  Circle,
   ChevronDown,
   ChevronRight,
+  Plus,
   Trash2,
-  Milestone,
   User,
+  Calendar,
+  ArrowRight,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-// ---- Inline editable text ----
-function InlineEdit({ value, onSave, className, placeholder = 'Click to edit…' }) {
+function fmtDate(iso) {
+  if (!iso) return null;
+  return new Date(iso + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+// ── InlineEdit ──────────────────────────────────────────────────────────────
+function InlineEdit({ value = '', onCommit, placeholder = 'Untitled', className = '' }) {
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(value);
+  const [draft, setDraft] = useState('');
   const inputRef = useRef(null);
 
+  const start = () => {
+    setDraft(value);
+    setEditing(true);
+    setTimeout(() => inputRef.current?.select(), 0);
+  };
   const commit = () => {
-    const trimmed = draft.trim();
-    if (trimmed && trimmed !== value) onSave(trimmed);
-    else setDraft(value);
     setEditing(false);
+    const v = draft.trim();
+    if (v && v !== value) onCommit(v);
   };
 
   if (editing) {
     return (
       <input
         ref={inputRef}
-        autoFocus
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={commit}
         onKeyDown={(e) => {
-          if (e.key === 'Enter') commit();
-          if (e.key === 'Escape') { setDraft(value); setEditing(false); }
+          if (e.key === 'Enter') { e.preventDefault(); commit(); }
+          if (e.key === 'Escape') setEditing(false);
         }}
-        className={cn('w-full rounded border border-blue-400 bg-white px-2 py-0.5 text-sm outline-none ring-2 ring-blue-500/20', className)}
+        className={cn('bg-transparent outline-none border-b border-blue-400 w-full', className)}
       />
     );
   }
-
   return (
     <span
-      onClick={() => { setDraft(value); setEditing(true); }}
-      className={cn('cursor-text rounded px-0.5 hover:bg-slate-100', className)}
-      title="Click to edit"
+      onClick={start}
+      className={cn('cursor-text hover:text-blue-600 transition-colors', !value && 'text-slate-400 italic', className)}
     >
-      {value || <span className="text-slate-400">{placeholder}</span>}
+      {value || placeholder}
     </span>
   );
 }
 
-// ---- Add item inline form ----
-function AddInline({ placeholder, onAdd, className }) {
-  const [active, setActive] = useState(false);
-  const [text, setText] = useState('');
+// ── DateField ────────────────────────────────────────────────────────────────
+function DateField({ value, onChange, placeholder = 'Set date' }) {
+  const [editing, setEditing] = useState(false);
+  if (editing) {
+    return (
+      <input
+        type="date"
+        defaultValue={value ?? ''}
+        autoFocus
+        onBlur={(e) => { onChange(e.target.value || null); setEditing(false); }}
+        onKeyDown={(e) => { if (e.key === 'Escape') setEditing(false); }}
+        className="rounded border border-blue-300 px-1 py-0.5 text-xs outline-none focus:ring-1 focus:ring-blue-400"
+      />
+    );
+  }
+  return (
+    <button
+      type="button"
+      onClick={() => setEditing(true)}
+      className={cn(
+        'flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[11px] transition-colors hover:bg-slate-100',
+        value ? 'text-slate-500' : 'text-slate-300 hover:text-slate-400'
+      )}
+    >
+      <Calendar size={9} />
+      {value ? fmtDate(value) : placeholder}
+    </button>
+  );
+}
 
-  const commit = async () => {
-    const trimmed = text.trim();
-    if (trimmed) await onAdd(trimmed);
-    setText('');
-    setActive(false);
+// ── AddInline ────────────────────────────────────────────────────────────────
+function AddInline({ placeholder, onAdd }) {
+  const [open, setOpen] = useState(false);
+  const [value, setValue] = useState('');
+  const inputRef = useRef(null);
+
+  const commit = () => {
+    const v = value.trim();
+    if (v) onAdd(v);
+    setValue('');
+    setOpen(false);
   };
 
-  if (!active) {
+  if (!open) {
     return (
       <button
-        onClick={() => setActive(true)}
-        className={cn(
-          'flex items-center gap-1 text-xs text-slate-400 hover:text-blue-600 transition-colors',
-          className
-        )}
+        type="button"
+        onClick={() => { setOpen(true); setTimeout(() => inputRef.current?.focus(), 0); }}
+        className="flex items-center gap-1 py-1 text-xs text-slate-400 transition-colors hover:text-blue-600"
       >
-        <Plus size={13} /> {placeholder}
+        <Plus size={12} /> {placeholder}
       </button>
     );
   }
-
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-2 py-1">
       <input
-        autoFocus
-        value={text}
-        onChange={(e) => setText(e.target.value)}
+        ref={inputRef}
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
         onBlur={commit}
         onKeyDown={(e) => {
-          if (e.key === 'Enter') commit();
-          if (e.key === 'Escape') { setText(''); setActive(false); }
+          if (e.key === 'Enter') { e.preventDefault(); commit(); }
+          if (e.key === 'Escape') { setValue(''); setOpen(false); }
         }}
         placeholder={placeholder}
-        className="flex-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+        className="flex-1 rounded-lg border border-blue-300 bg-white px-2.5 py-1.5 text-sm outline-none focus:ring-2 focus:ring-blue-400/20"
       />
+      <button type="button" onClick={() => { setValue(''); setOpen(false); }} className="text-xs text-slate-400">
+        Cancel
+      </button>
     </div>
   );
 }
 
-// ---- Single task row ----
-function TaskRow({ task, onToggle, onRename, onDelete }) {
-  const done = task.status === 'done';
-  const hasDetail = task.description || task.role;
-  const [expanded, setExpanded] = useState(false);
+// ── MoveMenu ─────────────────────────────────────────────────────────────────
+function MoveMenu({ label, items, onPick }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
 
+  if (items.length === 0) return null;
   return (
-    <div className={cn('group rounded-lg hover:bg-slate-50', expanded && 'bg-slate-50')}>
-      <div className="flex items-center gap-2 px-2 py-1.5">
-        <button
-          onClick={() => onToggle(task)}
-          className={cn(
-            'shrink-0 transition-colors',
-            done ? 'text-emerald-500 hover:text-emerald-700' : 'text-slate-300 hover:text-slate-500'
-          )}
-          title={done ? 'Mark as to-do' : 'Mark as done'}
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        title={label}
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center rounded p-1 text-[11px] text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+      >
+        <ArrowRight size={12} />
+      </button>
+      {open && (
+        <div
+          className="absolute right-0 top-full z-30 mt-1 min-w-[160px] rounded-xl border border-slate-200 bg-white p-1 shadow-lg"
+          onMouseLeave={() => setOpen(false)}
         >
-          {done ? <CheckCircle2 size={18} /> : <Circle size={18} />}
-        </button>
-
-        <div className="flex-1 min-w-0 flex items-center gap-1.5">
-          <InlineEdit
-            value={task.title}
-            onSave={(v) => onRename(task.id, v)}
-            className={cn('text-sm', done && 'line-through text-slate-400')}
-          />
-          {task.role && (
-            <span className="flex items-center gap-0.5 rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500">
-              <User size={10} /> {task.role}
-            </span>
-          )}
-          {task.estimated_hours != null && (
-            <span className="text-xs text-slate-400">{task.estimated_hours}h</span>
-          )}
-        </div>
-
-        {hasDetail && (
-          <button
-            onClick={() => setExpanded((o) => !o)}
-            className="shrink-0 text-slate-300 hover:text-slate-500 transition-colors"
-            title={expanded ? 'Hide details' : 'Show scope of work'}
-          >
-            {expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-          </button>
-        )}
-
-        <button
-          onClick={() => onDelete(task.id)}
-          className="shrink-0 rounded p-1 text-slate-300 opacity-0 group-hover:opacity-100 hover:bg-red-50 hover:text-red-500 transition-all"
-          title="Delete task"
-        >
-          <Trash2 size={13} />
-        </button>
-      </div>
-
-      {expanded && task.description && (
-        <div className="border-t border-slate-100 px-10 pb-2 pt-1.5">
-          <p className="text-xs leading-relaxed text-slate-500 whitespace-pre-wrap">{task.description}</p>
+          <p className="px-2 py-1 text-[10px] uppercase tracking-wide text-slate-400">{label}</p>
+          {items.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => { onPick(item.id); setOpen(false); }}
+              className="w-full truncate rounded-lg px-2 py-1.5 text-left text-xs text-slate-700 hover:bg-slate-100"
+            >
+              {item.name}
+            </button>
+          ))}
         </div>
       )}
     </div>
   );
 }
 
-// ---- Milestone block ----
-function MilestoneBlock({ milestone, tasks, onCreate, onToggleTask, onRenameTask, onDeleteTask, onRenameMilestone, onDeleteMilestone }) {
-  const [open, setOpen] = useState(true);
-  const done = tasks.filter((t) => t.status === 'done').length;
-  const total = tasks.length;
+// ── SortableTaskRow ───────────────────────────────────────────────────────────
+function SortableTaskRow({ task, allProjectMilestones, onUpdate, onDelete, onMoveTask }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: task.id,
+    data: { type: 'task', milestoneId: task.milestone_id },
+  });
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.35 : 1 };
+
+  const [expanded, setExpanded] = useState(false);
+  const hasExtra = Boolean(task.description || task.role);
+  const otherMilestones = (allProjectMilestones ?? []).filter((m) => m.id !== task.milestone_id);
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white">
-      <div className="flex items-center gap-2 px-4 py-3">
+    <div ref={setNodeRef} style={style} className="group relative">
+      <div className="flex items-start gap-1.5 rounded-lg px-1 py-1.5 hover:bg-slate-50/80">
+        {/* Drag handle */}
         <button
-          onClick={() => setOpen((o) => !o)}
-          className="shrink-0 text-slate-400 hover:text-slate-600"
+          {...attributes}
+          {...listeners}
+          tabIndex={-1}
+          className="mt-0.5 shrink-0 cursor-grab touch-none text-slate-200 opacity-0 group-hover:opacity-100 active:cursor-grabbing"
         >
-          {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+          <GripVertical size={13} />
         </button>
 
-        <Milestone size={15} className="shrink-0 text-slate-400" />
-
-        <InlineEdit
-          value={milestone.name}
-          onSave={(v) => onRenameMilestone(milestone.id, v)}
-          className="flex-1 text-sm font-semibold text-slate-800"
-        />
-
-        {total > 0 && (
-          <span className="text-xs text-slate-400">
-            {done}/{total}
-          </span>
-        )}
-
-        {milestone.due_date && (
-          <span className="text-xs text-slate-400">
-            Due {new Date(milestone.due_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-          </span>
-        )}
-
+        {/* Status toggle */}
         <button
-          onClick={() => onDeleteMilestone(milestone.id)}
-          className="shrink-0 rounded p-1 text-slate-300 hover:bg-red-50 hover:text-red-500 transition-colors"
-          title="Delete milestone"
+          type="button"
+          onClick={() => onUpdate(task.id, { status: task.status === 'done' ? 'todo' : 'done' })}
+          className="mt-0.5 shrink-0 text-slate-300 transition-colors hover:text-blue-500"
         >
-          <Trash2 size={13} />
+          {task.status === 'done'
+            ? <CheckCircle2 size={15} className="text-green-500" />
+            : <Circle size={15} />}
         </button>
-      </div>
 
-      {open && (
-        <div className="border-t border-slate-100 px-4 pb-3 pt-1 space-y-0.5">
-          {tasks.map((t) => (
-            <TaskRow
-              key={t.id}
-              task={t}
-              onToggle={onToggleTask}
-              onRename={onRenameTask}
-              onDelete={onDeleteTask}
+        {/* Main content */}
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <InlineEdit
+              value={task.title}
+              onCommit={(v) => onUpdate(task.id, { title: v })}
+              className={cn('text-sm text-slate-700', task.status === 'done' && 'line-through text-slate-400')}
             />
-          ))}
-          <div className="pt-1">
-            <AddInline
-              placeholder="Add task…"
-              onAdd={(title) => onCreate({ title, milestone_id: milestone.id })}
+            {task.role && (
+              <span className="flex shrink-0 items-center gap-1 rounded-full bg-blue-50 px-1.5 py-0.5 text-[10px] text-blue-600">
+                <User size={9} /> {task.role}
+              </span>
+            )}
+            {task.estimated_hours != null && (
+              <span className="shrink-0 text-[10px] text-slate-400">{task.estimated_hours}h</span>
+            )}
+            {hasExtra && (
+              <button
+                type="button"
+                onClick={() => setExpanded((v) => !v)}
+                className="ml-auto text-slate-300 transition-colors hover:text-slate-500"
+              >
+                {expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+              </button>
+            )}
+          </div>
+
+          {/* Dates */}
+          <div className="mt-0.5 flex items-center gap-0.5">
+            <DateField
+              value={task.start_date}
+              onChange={(v) => onUpdate(task.id, { start_date: v })}
+              placeholder="Start"
+            />
+            {(task.start_date || task.due_date) && (
+              <span className="text-[10px] text-slate-200">–</span>
+            )}
+            <DateField
+              value={task.due_date}
+              onChange={(v) => onUpdate(task.id, { due_date: v })}
+              placeholder="Due"
+            />
+          </div>
+
+          {/* Expanded description */}
+          {expanded && task.description && (
+            <div className="mt-1.5 rounded-lg bg-slate-50 p-2.5 text-xs text-slate-600">
+              <pre className="whitespace-pre-wrap font-sans">{task.description}</pre>
+            </div>
+          )}
+        </div>
+
+        {/* Row actions */}
+        <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+          <MoveMenu
+            label="Move to milestone"
+            items={otherMilestones.map((m) => ({ id: m.id, name: m.name }))}
+            onPick={(toMsId) => onMoveTask(task.id, toMsId)}
+          />
+          <button
+            type="button"
+            onClick={() => onDelete(task.id)}
+            className="rounded p-1 text-slate-300 transition-colors hover:text-red-500"
+          >
+            <Trash2 size={12} />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Drag overlays ─────────────────────────────────────────────────────────────
+function MilestoneGhost({ milestone }) {
+  return (
+    <div className="rounded-xl border border-blue-200 bg-white px-3 py-2 shadow-xl ring-1 ring-blue-200 opacity-90">
+      <span className="text-sm font-semibold text-slate-700">{milestone.name}</span>
+    </div>
+  );
+}
+function TaskGhost({ task }) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 shadow-xl opacity-90">
+      <span className="text-sm text-slate-700">{task.title}</span>
+    </div>
+  );
+}
+
+// ── SortableMilestoneBlock ────────────────────────────────────────────────────
+function SortableMilestoneBlock({
+  milestone,
+  tasks,
+  allProjectMilestones,
+  techSections,
+  onUpdateMilestone,
+  onDeleteMilestone,
+  onUpdateTask,
+  onDeleteTask,
+  onMoveTask,
+  onCreateTask,
+  onMoveMilestoneToSection,
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: milestone.id,
+    data: { type: 'milestone' },
+  });
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.35 : 1 };
+
+  const [collapsed, setCollapsed] = useState(false);
+  const done = tasks.filter((t) => t.status === 'done').length;
+  const taskIds = tasks.map((t) => t.id);
+  const otherSections = (techSections ?? []).filter((s) => s.id !== milestone.technology_id);
+
+  return (
+    <div ref={setNodeRef} style={style} className="mb-3">
+      {/* Milestone header */}
+      <div className="group flex items-start gap-2 rounded-xl border border-slate-200 bg-slate-50/80 px-2.5 py-2">
+        {/* Drag handle */}
+        <button
+          {...attributes}
+          {...listeners}
+          tabIndex={-1}
+          className="mt-0.5 shrink-0 cursor-grab touch-none text-slate-300 opacity-0 group-hover:opacity-100 active:cursor-grabbing"
+        >
+          <GripVertical size={14} />
+        </button>
+
+        {/* Collapse toggle */}
+        <button
+          type="button"
+          onClick={() => setCollapsed((v) => !v)}
+          className="mt-0.5 shrink-0 text-slate-400 transition-colors hover:text-slate-600"
+        >
+          {collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+        </button>
+
+        {/* Milestone info */}
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <InlineEdit
+              value={milestone.name}
+              onCommit={(v) => onUpdateMilestone(milestone.id, { name: v })}
+              className="text-sm font-semibold text-slate-700"
+            />
+            <span className="text-xs text-slate-400 tabular-nums">{done}/{tasks.length}</span>
+          </div>
+          <div className="mt-0.5 flex items-center gap-0.5">
+            <DateField
+              value={milestone.start_date}
+              onChange={(v) => onUpdateMilestone(milestone.id, { start_date: v })}
+              placeholder="Start date"
+            />
+            <span className="text-[10px] text-slate-200">–</span>
+            <DateField
+              value={milestone.due_date}
+              onChange={(v) => onUpdateMilestone(milestone.id, { due_date: v })}
+              placeholder="Due date"
             />
           </div>
         </div>
+
+        {/* Header actions */}
+        <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+          {otherSections.length > 0 && (
+            <MoveMenu
+              label="Move to section"
+              items={otherSections.map((s) => ({ id: s.id, name: s.technology }))}
+              onPick={(toId) => onMoveMilestoneToSection?.(milestone.id, toId)}
+            />
+          )}
+          <button
+            type="button"
+            title="Delete phase"
+            onClick={() => {
+              if (confirm(`Delete phase "${milestone.name}"? Tasks will become unassigned.`))
+                onDeleteMilestone(milestone.id);
+            }}
+            className="rounded p-1 text-slate-300 transition-colors hover:text-red-500"
+          >
+            <Trash2 size={13} />
+          </button>
+        </div>
+      </div>
+
+      {/* Task list */}
+      {!collapsed && (
+        <div className="ml-4 mt-0.5 border-l-2 border-slate-100 pb-1 pl-3">
+          <SortableContext items={taskIds} strategy={verticalListSortingStrategy}>
+            {tasks.map((task) => (
+              <SortableTaskRow
+                key={task.id}
+                task={task}
+                allProjectMilestones={allProjectMilestones}
+                onUpdate={onUpdateTask}
+                onDelete={onDeleteTask}
+                onMoveTask={onMoveTask}
+              />
+            ))}
+          </SortableContext>
+          <AddInline
+            placeholder="Add task"
+            onAdd={(title) => onCreateTask({ milestone_id: milestone.id, title })}
+          />
+        </div>
       )}
     </div>
   );
 }
 
-// ---- Main export ----
+// ── Main export ───────────────────────────────────────────────────────────────
 export default function TaskSection({
   milestones,
   tasks,
+  allProjectMilestones,
+  techSections,
   onCreateMilestone,
   onCreateTask,
   onUpdateTask,
   onDeleteTask,
   onUpdateMilestone,
   onDeleteMilestone,
+  onBatchUpdateMilestones,
+  onBatchUpdateTasks,
+  onMoveMilestoneToSection,
 }) {
-  const ungrouped = tasks.filter((t) => !t.milestone_id);
+  const [activeId, setActiveId] = useState(null);
+  const [activeType, setActiveType] = useState(null);
 
-  const toggleTask = (task) =>
-    onUpdateTask(task.id, { status: task.status === 'done' ? 'todo' : 'done' });
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
 
-  const renameTask = (id, title) => onUpdateTask(id, { title });
+  const milestoneIds = milestones.map((m) => m.id);
+  const ungroupedTasks = tasks.filter((t) => !t.milestone_id);
+
+  const handleDragStart = ({ active }) => {
+    setActiveId(active.id);
+    setActiveType(active.data.current?.type ?? null);
+  };
+  const handleDragCancel = () => { setActiveId(null); setActiveType(null); };
+
+  const handleDragEnd = ({ active, over }) => {
+    setActiveId(null);
+    setActiveType(null);
+    if (!over || active.id === over.id) return;
+
+    const overType = over.data.current?.type;
+
+    // Milestone reorder
+    if (activeType === 'milestone') {
+      const oldIdx = milestones.findIndex((m) => m.id === active.id);
+      const newIdx = milestones.findIndex((m) => m.id === over.id);
+      if (oldIdx < 0 || newIdx < 0 || oldIdx === newIdx) return;
+      const reordered = arrayMove(milestones, oldIdx, newIdx);
+      onBatchUpdateMilestones?.(reordered.map((m, i) => ({ id: m.id, sort_order: i * 10 })));
+      return;
+    }
+
+    // Task reorder / cross-milestone
+    if (activeType === 'task') {
+      const activeTask = tasks.find((t) => t.id === active.id);
+      if (!activeTask) return;
+
+      let toMilestoneId = activeTask.milestone_id;
+      if (overType === 'milestone') toMilestoneId = over.id;
+      else if (overType === 'task') toMilestoneId = over.data.current?.milestoneId ?? activeTask.milestone_id;
+
+      if (toMilestoneId === activeTask.milestone_id) {
+        // Same milestone — reorder
+        const sameTasks = tasks.filter((t) => t.milestone_id === toMilestoneId);
+        const oldIdx = sameTasks.findIndex((t) => t.id === active.id);
+        const newIdx = sameTasks.findIndex((t) => t.id === over.id);
+        if (oldIdx < 0 || newIdx < 0 || oldIdx === newIdx) return;
+        const reordered = arrayMove(sameTasks, oldIdx, newIdx);
+        onBatchUpdateTasks?.(reordered.map((t, i) => ({ id: t.id, sort_order: i * 10 })));
+      } else {
+        // Cross-milestone — append to target
+        const toMs = (allProjectMilestones ?? milestones).find((m) => m.id === toMilestoneId);
+        const targetTasks = tasks.filter((t) => t.milestone_id === toMilestoneId);
+        onBatchUpdateTasks?.([{
+          id: active.id,
+          milestone_id: toMilestoneId,
+          technology_id: toMs?.technology_id ?? null,
+          sort_order: targetTasks.length * 10,
+        }]);
+      }
+    }
+  };
+
+  const handleMoveTask = (taskId, toMilestoneId) => {
+    const toMs = (allProjectMilestones ?? milestones).find((m) => m.id === toMilestoneId);
+    const targetTasks = tasks.filter((t) => t.milestone_id === toMilestoneId);
+    onBatchUpdateTasks?.([{
+      id: taskId,
+      milestone_id: toMilestoneId,
+      technology_id: toMs?.technology_id ?? null,
+      sort_order: targetTasks.length * 10,
+    }]);
+  };
+
+  const activeMilestone = activeId ? milestones.find((m) => m.id === activeId) : null;
+  const activeTask = activeId ? tasks.find((t) => t.id === activeId) : null;
 
   return (
-    <div className="space-y-3">
-      {milestones.map((ms) => (
-        <MilestoneBlock
-          key={ms.id}
-          milestone={ms}
-          tasks={tasks.filter((t) => t.milestone_id === ms.id)}
-          onCreate={onCreateTask}
-          onToggleTask={toggleTask}
-          onRenameTask={renameTask}
-          onDeleteTask={onDeleteTask}
-          onRenameMilestone={(id, name) => onUpdateMilestone(id, { name })}
-          onDeleteMilestone={onDeleteMilestone}
-        />
-      ))}
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+      onDragCancel={handleDragCancel}
+    >
+      <div>
+        <SortableContext items={milestoneIds} strategy={verticalListSortingStrategy}>
+          {milestones.map((milestone) => {
+            const mTasks = tasks
+              .filter((t) => t.milestone_id === milestone.id)
+              .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+            return (
+              <SortableMilestoneBlock
+                key={milestone.id}
+                milestone={milestone}
+                tasks={mTasks}
+                allProjectMilestones={allProjectMilestones}
+                techSections={techSections}
+                onUpdateMilestone={onUpdateMilestone}
+                onDeleteMilestone={onDeleteMilestone}
+                onUpdateTask={onUpdateTask}
+                onDeleteTask={onDeleteTask}
+                onMoveTask={handleMoveTask}
+                onCreateTask={onCreateTask}
+                onMoveMilestoneToSection={onMoveMilestoneToSection}
+              />
+            );
+          })}
+        </SortableContext>
 
-      {/* Ungrouped tasks */}
-      {(ungrouped.length > 0 || milestones.length === 0) && (
-        <div className="rounded-xl border border-dashed border-slate-200 bg-white px-4 pb-3 pt-3 space-y-0.5">
-          {milestones.length > 0 && (
-            <p className="mb-1 text-xs font-medium uppercase tracking-wide text-slate-400">
-              Unassigned
-            </p>
-          )}
-          {ungrouped.map((t) => (
-            <TaskRow
-              key={t.id}
-              task={t}
-              onToggle={toggleTask}
-              onRename={renameTask}
-              onDelete={onDeleteTask}
-            />
-          ))}
-          <div className="pt-1">
-            <AddInline
-              placeholder="Add task…"
-              onAdd={(title) => onCreateTask({ title, milestone_id: null })}
-            />
+        {/* Ungrouped tasks (no milestone assigned) */}
+        {ungroupedTasks.length > 0 && (
+          <div className="mt-3 rounded-xl border border-dashed border-slate-200 p-3">
+            <p className="mb-1.5 text-xs font-medium text-slate-400">Ungrouped Tasks</p>
+            <SortableContext
+              items={ungroupedTasks.map((t) => t.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              {ungroupedTasks.map((task) => (
+                <SortableTaskRow
+                  key={task.id}
+                  task={task}
+                  allProjectMilestones={allProjectMilestones}
+                  onUpdate={onUpdateTask}
+                  onDelete={onDeleteTask}
+                  onMoveTask={handleMoveTask}
+                />
+              ))}
+            </SortableContext>
           </div>
-        </div>
-      )}
+        )}
 
-      <div className="flex gap-2 pt-1">
-        <AddInline
-          placeholder="Add milestone…"
-          onAdd={(name) => onCreateMilestone({ name })}
-          className="text-sm"
-        />
+        <div className="mt-2">
+          <AddInline
+            placeholder="Add phase / milestone"
+            onAdd={(name) => onCreateMilestone({ name })}
+          />
+        </div>
       </div>
-    </div>
+
+      <DragOverlay>
+        {activeMilestone && <MilestoneGhost milestone={activeMilestone} />}
+        {activeTask && <TaskGhost task={activeTask} />}
+      </DragOverlay>
+    </DndContext>
   );
 }

@@ -226,6 +226,118 @@ export function usePSAProject(projectId, session) {
     [supabase, refresh]
   );
 
+  // ---- Batch reorder / move ----
+  const batchUpdateMilestones = useCallback(
+    async (updates) => {
+      // updates: [{ id, sort_order, technology_id?, ... }]
+      if (!supabase) {
+        writePsa((s) => ({
+          ...s,
+          milestones: s.milestones.map((m) => {
+            const u = updates.find((u) => u.id === m.id);
+            const { id: _id, ...rest } = u ?? {};
+            return u ? { ...m, ...rest } : m;
+          }),
+        }));
+        return;
+      }
+      await Promise.all(
+        updates.map(({ id, ...data }) =>
+          supabase.from('psa_milestones').update(data).eq('id', id)
+        )
+      );
+      await refresh();
+    },
+    [supabase, refresh]
+  );
+
+  const batchUpdateTasks = useCallback(
+    async (updates) => {
+      // updates: [{ id, sort_order?, milestone_id?, technology_id?, ... }]
+      if (!supabase) {
+        writePsa((s) => ({
+          ...s,
+          tasks: s.tasks.map((t) => {
+            const u = updates.find((u) => u.id === t.id);
+            const { id: _id, ...rest } = u ?? {};
+            return u ? { ...t, ...rest } : t;
+          }),
+        }));
+        return;
+      }
+      await Promise.all(
+        updates.map(({ id, ...data }) =>
+          supabase.from('psa_tasks').update(data).eq('id', id)
+        )
+      );
+      await refresh();
+    },
+    [supabase, refresh]
+  );
+
+  // Move a milestone (and all its tasks) to a different technology section.
+  const moveMilestoneToSection = useCallback(
+    async (milestoneId, toTechnologyId) => {
+      const taskIds = tasks.filter((t) => t.milestone_id === milestoneId).map((t) => t.id);
+      if (!supabase) {
+        writePsa((s) => ({
+          ...s,
+          milestones: s.milestones.map((m) =>
+            m.id === milestoneId ? { ...m, technology_id: toTechnologyId } : m
+          ),
+          tasks: s.tasks.map((t) =>
+            taskIds.includes(t.id) ? { ...t, technology_id: toTechnologyId } : t
+          ),
+        }));
+        return;
+      }
+      await supabase
+        .from('psa_milestones')
+        .update({ technology_id: toTechnologyId })
+        .eq('id', milestoneId);
+      if (taskIds.length > 0) {
+        await supabase
+          .from('psa_tasks')
+          .update({ technology_id: toTechnologyId })
+          .in('id', taskIds);
+      }
+      await refresh();
+    },
+    [supabase, tasks, refresh]
+  );
+
+  // Merge one technology section into another: move all milestones + tasks then delete the section.
+  const mergeTechnologies = useCallback(
+    async (fromId, toId) => {
+      if (!supabase) {
+        writePsa((s) => ({
+          ...s,
+          milestones: s.milestones.map((m) =>
+            m.technology_id === fromId ? { ...m, technology_id: toId } : m
+          ),
+          tasks: s.tasks.map((t) =>
+            t.technology_id === fromId ? { ...t, technology_id: toId } : t
+          ),
+          technologies: (s.technologies ?? []).filter((t) => t.id !== fromId),
+        }));
+        return;
+      }
+      await supabase
+        .from('psa_milestones')
+        .update({ technology_id: toId })
+        .eq('technology_id', fromId)
+        .eq('project_id', projectId);
+      await supabase
+        .from('psa_tasks')
+        .update({ technology_id: toId })
+        .eq('technology_id', fromId)
+        .eq('project_id', projectId);
+      await supabase.from('project_technologies').delete().eq('id', fromId);
+      await refresh();
+    },
+    [supabase, projectId, refresh]
+  );
+
   // ---- Technologies ----
   const createTechnology = useCallback(
     async (data) => {
@@ -346,6 +458,10 @@ export function usePSAProject(projectId, session) {
     createTechnology,
     deleteTechnology,
     applyTemplate,
+    batchUpdateMilestones,
+    batchUpdateTasks,
+    moveMilestoneToSection,
+    mergeTechnologies,
   };
 }
 
