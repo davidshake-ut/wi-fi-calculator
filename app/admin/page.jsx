@@ -1,24 +1,13 @@
-'use client';
-
-import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
 import AuthGuard from '@/components/AuthGuard';
+import OSShell from '@/components/OSShell';
 import AdminPanel from '@/components/AdminPanel';
 
 export default function AdminPage() {
   return (
     <AuthGuard requireAdmin>
-      <div className="flex min-h-screen flex-col">
-        <header className="border-b border-slate-200 bg-white px-4 py-3">
-          <div className="flex items-center justify-between">
-            <h1 className="text-sm font-semibold text-slate-800">Team Administration</h1>
-            <Link href="/" className="flex items-center gap-1 text-sm text-blue-700 hover:underline">
-              <ArrowLeft size={14} /> Back to Calculator
-            </Link>
-          </div>
-        </header>
+      <OSShell>
         <AdminPanel />
-      </div>
+      </OSShell>
     </AuthGuard>
   );
 }

@@ -88,7 +88,7 @@ function LoginScreen() {
         <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 text-white shadow-sm">
           <Wifi size={18} />
         </span>
-        <h1 className="text-sm font-semibold text-slate-800">Managed Wi-Fi BOM Calculator</h1>
+        <h1 className="text-sm font-semibold text-slate-800">FSG OS</h1>
       </div>
 
       {mode === 'reset' ? (

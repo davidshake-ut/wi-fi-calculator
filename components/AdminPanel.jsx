@@ -5,6 +5,7 @@ import { Trash2, UserPlus, Building2 } from 'lucide-react';
 import { getSupabase } from '@/lib/supabase/client';
 import { useSession } from '@/components/SessionProvider';
 import { Card, Button, Field, TextInput, Select, Badge } from '@/components/ui/primitives';
+import ModulesPanel from '@/components/ModulesPanel';
 
 export default function AdminPanel() {
   const supabase = getSupabase();
@@ -252,6 +253,8 @@ export default function AdminPanel() {
             onReassign={reassignTeam}
             superAdmin
           />
+
+          <ModulesPanel companies={companies} />
         </>
       ) : (
         // ============================ TEAM ADMIN ============================
@@ -301,6 +304,8 @@ export default function AdminPanel() {
             onRole={setRole}
             onRemove={removeMember}
           />
+
+          <ModulesPanel />
         </>
       )}
     </div>

@@ -3,9 +3,9 @@ import { SessionProvider } from "@/components/SessionProvider";
 import FaviconManager from "@/components/FaviconManager";
 
 export const metadata = {
-  title: "Managed Wi-Fi BOM Calculator",
+  title: "FSG OS",
   description:
-    "Generate itemized hardware BOMs, software subscriptions, and professional-services quotes for managed Wi-Fi and camera-system deployments.",
+    "FSG Operating System — modular business software for Technology Solutions Providers.",
 };
 
 export default function RootLayout({ children }) {
