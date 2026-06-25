@@ -13,6 +13,7 @@ import {
   LogOut,
   Layers,
   LayoutTemplate,
+  BookMarked,
 } from 'lucide-react';
 import { useSession } from '@/components/SessionProvider';
 import { useModules } from '@/hooks/useModules';
@@ -25,7 +26,8 @@ const NAV_ITEMS = [
   { key: 'projects',   label: 'Projects',        href: '/projects',   icon: FolderKanban },
   { key: 'templates',  label: 'Templates',       href: '/templates',  icon: LayoutTemplate },
   { key: 'support',    label: 'Support',         href: '/support',    icon: LifeBuoy },
-  { key: 'resources', label: 'Resources',       href: '/resources', icon: BookOpen },
+  { key: 'resources',  label: 'Resources',       href: '/resources',  icon: BookOpen },
+  { key: 'knowledge',  label: 'Knowledge Base',  href: '/knowledge',  icon: BookMarked },
 ];
 
 function NavLink({ href, icon: Icon, label, active }) {
