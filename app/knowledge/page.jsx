@@ -672,27 +672,30 @@ function KnowledgeContent() {
   const [uploadOpen,    setUploadOpen]    = useState(false);
   const [isDropTarget,  setIsDropTarget]  = useState(false);
   const [viewMode,      setViewMode]      = useState('cards'); // 'cards' | 'details'
-  const [drawerWidth,   setDrawerWidth]   = useState(420);
+  const [drawerWidth,  setDrawerWidth]  = useState(420);
+  const [isResizing,   setIsResizing]   = useState(false);
 
-  const searchRef   = useRef(null);
-  const dragRef     = useRef(null); // { startX, startWidth }
+  const searchRef = useRef(null);
+  const dragRef   = useRef(null); // { startX, startWidth }
 
   const startResize = useCallback((e) => {
     e.preventDefault();
     dragRef.current = { startX: e.clientX, startWidth: drawerWidth };
+    setIsResizing(true);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
 
     const onMove = (ev) => {
       const delta = dragRef.current.startX - ev.clientX;
       setDrawerWidth(Math.min(900, Math.max(280, dragRef.current.startWidth + delta)));
     };
     const onUp = () => {
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
+      setIsResizing(false);
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
     };
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup', onUp);
   }, [drawerWidth]);
@@ -755,6 +758,9 @@ function KnowledgeContent() {
         if (files.length) uploadDocuments(files, activeGroup);
       }}
     >
+      {/* Drag-capture overlay — sits above iframes during panel resize */}
+      {isResizing && <div className="fixed inset-0 z-50 cursor-col-resize" />}
+
       {/* Drop overlay */}
       {isDropTarget && (
         <div className="pointer-events-none absolute inset-0 z-40 flex items-center justify-center border-2 border-dashed border-blue-400 bg-blue-50/70 backdrop-blur-sm">
