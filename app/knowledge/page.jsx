@@ -486,7 +486,7 @@ function SearchResultRow({ result, group, query, active, onClick }) {
 }
 
 // ── Document viewer drawer ────────────────────────────────────────────────────
-function DocumentViewer({ doc, onClose, getSignedUrl }) {
+function DocumentViewer({ doc, onClose, getSignedUrl, width }) {
   const [url,     setUrl]     = useState(null);
   const [content, setContent] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -518,7 +518,7 @@ function DocumentViewer({ doc, onClose, getSignedUrl }) {
   if (!doc) return null;
 
   return (
-    <div className="flex w-[420px] shrink-0 flex-col border-l border-slate-200 bg-white">
+    <div className="flex shrink-0 flex-col border-l border-slate-200 bg-white" style={{ width }}>
       {/* Header */}
       <div className="flex items-center gap-2 border-b border-slate-200 px-4 py-3">
         <div className={cn('flex h-7 w-7 shrink-0 items-center justify-center rounded-lg', fileMeta(doc.file_type).bg)}>
@@ -672,8 +672,30 @@ function KnowledgeContent() {
   const [uploadOpen,    setUploadOpen]    = useState(false);
   const [isDropTarget,  setIsDropTarget]  = useState(false);
   const [viewMode,      setViewMode]      = useState('cards'); // 'cards' | 'details'
+  const [drawerWidth,   setDrawerWidth]   = useState(420);
 
-  const searchRef = useRef(null);
+  const searchRef   = useRef(null);
+  const dragRef     = useRef(null); // { startX, startWidth }
+
+  const startResize = useCallback((e) => {
+    e.preventDefault();
+    dragRef.current = { startX: e.clientX, startWidth: drawerWidth };
+
+    const onMove = (ev) => {
+      const delta = dragRef.current.startX - ev.clientX;
+      setDrawerWidth(Math.min(900, Math.max(280, dragRef.current.startWidth + delta)));
+    };
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  }, [drawerWidth]);
 
   // Close viewer when doc is deleted
   useEffect(() => {
@@ -946,13 +968,27 @@ function KnowledgeContent() {
             )}
           </div>
 
-          {/* Document viewer drawer */}
+          {/* Resize handle + document viewer */}
           {selectedDoc && (
-            <DocumentViewer
-              doc={selectedDoc}
-              onClose={() => setSelectedDoc(null)}
-              getSignedUrl={getSignedUrl}
-            />
+            <>
+              <div
+                onMouseDown={startResize}
+                className="group relative w-1 shrink-0 cursor-col-resize bg-slate-200 transition-colors hover:bg-blue-400"
+              >
+                {/* Centre pip */}
+                <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                  <span className="block h-1 w-1 rounded-full bg-white" />
+                  <span className="block h-1 w-1 rounded-full bg-white" />
+                  <span className="block h-1 w-1 rounded-full bg-white" />
+                </div>
+              </div>
+              <DocumentViewer
+                doc={selectedDoc}
+                onClose={() => setSelectedDoc(null)}
+                getSignedUrl={getSignedUrl}
+                width={drawerWidth}
+              />
+            </>
           )}
         </div>
       </div>
