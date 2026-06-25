@@ -499,9 +499,11 @@ function DocumentViewer({ doc, onClose, getSignedUrl }) {
       const signed = await getSignedUrl(doc.file_path);
       if (!signed) { setLoading(false); return; }
 
-      if (doc.file_type === 'pdf' || doc.file_type === 'html') {
+      if (doc.file_type === 'pdf') {
         setUrl(signed);
-      } else if (doc.file_type === 'txt' || doc.file_type === 'md') {
+      } else if (doc.file_type === 'html' || doc.file_type === 'txt' || doc.file_type === 'md') {
+        // Fetch text client-side so we control rendering; avoids Supabase
+        // serving files as attachments or with wrong Content-Type.
         try {
           const res = await fetch(signed);
           setContent(await res.text());
@@ -548,8 +550,17 @@ function DocumentViewer({ doc, onClose, getSignedUrl }) {
           </div>
         ) : doc.file_type === 'pdf' && url ? (
           <iframe src={url} className="h-full w-full border-0" title={doc.name} />
-        ) : doc.file_type === 'html' && url ? (
-          <iframe src={url} sandbox="allow-same-origin" className="h-full w-full border-0" title={doc.name} />
+        ) : doc.file_type === 'html' && content != null ? (
+          <iframe
+            srcDoc={content}
+            sandbox="allow-same-origin allow-popups"
+            className="h-full w-full border-0"
+            title={doc.name}
+          />
+        ) : (doc.file_type === 'txt' || doc.file_type === 'md') && content != null ? (
+          <div className="h-full overflow-y-auto p-5">
+            <pre className="whitespace-pre-wrap font-mono text-xs leading-relaxed text-slate-700">{content}</pre>
+          </div>
         ) : content != null ? (
           <div className="h-full overflow-y-auto p-5">
             <pre className="whitespace-pre-wrap font-mono text-xs leading-relaxed text-slate-700">{content}</pre>
