@@ -419,7 +419,7 @@ function ProjectDetail() {
             technology={applyModal.technology}
             templates={allTemplates}
             projectStartDate={project?.start_date}
-            onApply={(template) => applyTemplate(template, applyModal.technologyId, project?.start_date)}
+            onApply={(template, startDate) => applyTemplate(template, applyModal.technologyId, startDate)}
             onClose={() => setApplyModal(null)}
           />
         )}
