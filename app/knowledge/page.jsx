@@ -5,7 +5,7 @@ import {
   Search, Upload, FileText, Code2, Hash, AlignLeft, File, X,
   Trash2, Download, Plus, Loader2,
   BookOpen, MoreHorizontal, AlertCircle,
-  BookMarked,
+  BookMarked, LayoutGrid, List,
 } from 'lucide-react';
 import AuthGuard from '@/components/AuthGuard';
 import OSShell from '@/components/OSShell';
@@ -357,6 +357,88 @@ function DocCard({ doc, group, groups, onClick, onDelete, onMove }) {
   );
 }
 
+// ── Document row (details / list view) ───────────────────────────────────────
+function DocRow({ doc, group, groups, onClick, onDelete, onMove }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  return (
+    <div
+      className="group relative flex cursor-pointer items-center gap-3 border-b border-slate-100 px-4 py-2.5 transition-colors hover:bg-slate-50 last:border-b-0"
+      onClick={onClick}
+    >
+      {/* Icon */}
+      <div className={cn('flex h-7 w-7 shrink-0 items-center justify-center rounded-lg', fileMeta(doc.file_type).bg)}>
+        <FileTypeIcon type={doc.file_type} size={14} />
+      </div>
+
+      {/* Name */}
+      <p className="min-w-0 flex-1 truncate text-sm font-medium text-slate-800">{doc.name}</p>
+
+      {/* Group */}
+      <div className="w-32 shrink-0">
+        {group ? (
+          <span className={cn('inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium', colorOf(group).pill)}>
+            <span className={cn('h-1.5 w-1.5 rounded-full', colorOf(group).dot)} />
+            {group.name}
+          </span>
+        ) : (
+          <span className="text-[11px] text-slate-300">—</span>
+        )}
+      </div>
+
+      {/* Type */}
+      <div className="w-14 shrink-0">
+        <FileTypeBadge type={doc.file_type} />
+      </div>
+
+      {/* Size */}
+      <p className="w-16 shrink-0 text-right text-xs text-slate-400 tabular-nums">{fmtSize(doc.file_size) || '—'}</p>
+
+      {/* Date */}
+      <p className="w-28 shrink-0 text-right text-xs text-slate-400 tabular-nums">{fmtDate(doc.created_at)}</p>
+
+      {/* Actions */}
+      <div className="w-7 shrink-0 flex justify-end">
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); setMenuOpen((v) => !v); }}
+          className="hidden rounded p-1 text-slate-300 hover:bg-slate-200 hover:text-slate-600 group-hover:flex"
+        >
+          <MoreHorizontal size={13} />
+        </button>
+        {menuOpen && (
+          <div
+            className="absolute right-4 top-8 z-20 min-w-[170px] rounded-xl border border-slate-200 bg-white p-1 shadow-lg"
+            onClick={(e) => e.stopPropagation()}
+            onMouseLeave={() => setMenuOpen(false)}
+          >
+            <p className="px-2 py-1 text-[10px] uppercase tracking-wide text-slate-400">Move to group</p>
+            <button type="button"
+              onClick={() => { onMove(doc.id, null); setMenuOpen(false); }}
+              className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-slate-600 hover:bg-slate-50">
+              <BookOpen size={11} /> No group
+            </button>
+            {groups.filter((g) => g.id !== doc.group_id).map((g) => (
+              <button key={g.id} type="button"
+                onClick={() => { onMove(doc.id, g.id); setMenuOpen(false); }}
+                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-slate-600 hover:bg-slate-50">
+                <span className={cn('h-2 w-2 rounded-full', colorOf(g).dot)} />
+                {g.name}
+              </button>
+            ))}
+            <div className="my-1 border-t border-slate-100" />
+            <button type="button"
+              onClick={() => { if (confirm(`Delete "${doc.name}"?`)) { onDelete(doc.id); setMenuOpen(false); } }}
+              className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs text-red-600 hover:bg-red-50">
+              <Trash2 size={11} /> Delete
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Search result row ─────────────────────────────────────────────────────────
 function SearchResultRow({ result, group, query, active, onClick }) {
   return (
@@ -503,8 +585,12 @@ function UploadZone({ groups, onUpload, onClose }) {
   }, [onUpload, onClose, groupId]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onDragOver={(e) => e.stopPropagation()}
+      onDrop={(e) => e.stopPropagation()}
+    >
       <div className="flex w-full max-w-lg flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-xl">
         <div className="flex items-center justify-between">
           <h2 className="text-base font-semibold text-slate-900">Upload Documents</h2>
@@ -574,6 +660,7 @@ function KnowledgeContent() {
   const [hoveredResult, setHoveredResult] = useState(0);
   const [uploadOpen,    setUploadOpen]    = useState(false);
   const [isDropTarget,  setIsDropTarget]  = useState(false);
+  const [viewMode,      setViewMode]      = useState('cards'); // 'cards' | 'details'
 
   const searchRef = useRef(null);
 
@@ -703,6 +790,32 @@ function KnowledgeContent() {
             </div>
           )}
 
+          {/* View toggle */}
+          <div className="flex shrink-0 items-center rounded-lg border border-slate-200 bg-slate-50 p-0.5">
+            <button
+              type="button"
+              title="Card view"
+              onClick={() => setViewMode('cards')}
+              className={cn('rounded p-1.5 transition-colors',
+                viewMode === 'cards'
+                  ? 'bg-white text-blue-600 shadow-sm'
+                  : 'text-slate-400 hover:text-slate-600')}
+            >
+              <LayoutGrid size={14} />
+            </button>
+            <button
+              type="button"
+              title="Details view"
+              onClick={() => setViewMode('details')}
+              className={cn('rounded p-1.5 transition-colors',
+                viewMode === 'details'
+                  ? 'bg-white text-blue-600 shadow-sm'
+                  : 'text-slate-400 hover:text-slate-600')}
+            >
+              <List size={14} />
+            </button>
+          </div>
+
           <button
             type="button"
             onClick={() => setUploadOpen(true)}
@@ -754,7 +867,10 @@ function KnowledgeContent() {
               <>
                 {/* Upload progress ghost cards */}
                 {Object.entries(uploads).length > 0 && (
-                  <div className="mb-4 grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3">
+                  <div className={cn('mb-4', viewMode === 'cards'
+                    ? 'grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3'
+                    : 'space-y-1'
+                  )}>
                     {Object.entries(uploads).map(([uid, u]) => (
                       <UploadProgressCard key={uid} {...u} />
                     ))}
@@ -775,10 +891,35 @@ function KnowledgeContent() {
                     <p className="text-sm font-medium">No documents yet</p>
                     <p className="text-xs text-slate-300">Drop files anywhere or click Upload to get started</p>
                   </div>
-                ) : (
+                ) : viewMode === 'cards' ? (
                   <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3">
                     {visibleDocs.map((doc) => (
                       <DocCard
+                        key={doc.id}
+                        doc={doc}
+                        group={groupById(doc.group_id)}
+                        groups={groups}
+                        onClick={() => setSelectedDoc(doc)}
+                        onDelete={deleteDocument}
+                        onMove={(id, gid) => updateDocument(id, { group_id: gid })}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  /* Details view */
+                  <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+                    {/* Header row */}
+                    <div className="flex items-center gap-3 border-b border-slate-200 bg-slate-50 px-4 py-2">
+                      <div className="w-7 shrink-0" />
+                      <p className="flex-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Name</p>
+                      <p className="w-32 shrink-0 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Group</p>
+                      <p className="w-14 shrink-0 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Type</p>
+                      <p className="w-16 shrink-0 text-right text-[11px] font-semibold uppercase tracking-wide text-slate-400">Size</p>
+                      <p className="w-28 shrink-0 text-right text-[11px] font-semibold uppercase tracking-wide text-slate-400">Date</p>
+                      <div className="w-7 shrink-0" />
+                    </div>
+                    {visibleDocs.map((doc) => (
+                      <DocRow
                         key={doc.id}
                         doc={doc}
                         group={groupById(doc.group_id)}
