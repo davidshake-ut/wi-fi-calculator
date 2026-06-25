@@ -5,7 +5,7 @@ import {
   Search, Upload, FileText, Code2, Hash, AlignLeft, File, X,
   Trash2, Download, Plus, Loader2,
   BookOpen, MoreHorizontal, AlertCircle,
-  BookMarked, LayoutGrid, List,
+  BookMarked, LayoutGrid, List, ListOrdered, Link2, FilePlus,
 } from 'lucide-react';
 import AuthGuard from '@/components/AuthGuard';
 import OSShell from '@/components/OSShell';
@@ -487,17 +487,19 @@ function SearchResultRow({ result, group, query, active, onClick }) {
 
 // ── Document viewer drawer ────────────────────────────────────────────────────
 function DocumentViewer({ doc, onClose, getSignedUrl, width }) {
-  const [url,     setUrl]     = useState(null);
-  const [content, setContent] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [url,          setUrl]          = useState(null);
+  const [content,      setContent]      = useState(null);
+  const [loading,      setLoading]      = useState(true);
+  const [signedUrl,    setSignedUrl]    = useState(null); // always set; used for download
 
   useEffect(() => {
     if (!doc) return;
-    setUrl(null); setContent(null); setLoading(true);
+    setUrl(null); setContent(null); setSignedUrl(null); setLoading(true);
 
     (async () => {
       const signed = await getSignedUrl(doc.file_path);
       if (!signed) { setLoading(false); return; }
+      setSignedUrl(signed);
 
       if (doc.file_type === 'pdf') {
         setUrl(signed);
@@ -515,6 +517,18 @@ function DocumentViewer({ doc, onClose, getSignedUrl, width }) {
     })();
   }, [doc?.id]);
 
+  const handleDownload = async () => {
+    if (!signedUrl) return;
+    try {
+      const res  = await fetch(signedUrl);
+      const blob = await res.blob();
+      const obj  = URL.createObjectURL(blob);
+      const a    = Object.assign(document.createElement('a'), { href: obj, download: doc.name });
+      a.click();
+      URL.revokeObjectURL(obj);
+    } catch {}
+  };
+
   if (!doc) return null;
 
   return (
@@ -529,11 +543,11 @@ function DocumentViewer({ doc, onClose, getSignedUrl, width }) {
           <p className="text-[10px] text-slate-400">{fmtDate(doc.created_at)} · {fmtSize(doc.file_size)}</p>
         </div>
         <div className="flex shrink-0 items-center gap-1">
-          {url && (
-            <a href={url} download target="_blank" rel="noreferrer"
-              className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600" title="Download">
+          {signedUrl && (
+            <button type="button" onClick={handleDownload} title="Download"
+              className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
               <Download size={14} />
-            </a>
+            </button>
           )}
           <button type="button" onClick={onClose}
             className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
@@ -569,16 +583,222 @@ function DocumentViewer({ doc, onClose, getSignedUrl, width }) {
           <div className="flex h-full flex-col items-center justify-center gap-3 text-slate-400">
             <File size={32} className="text-slate-200" />
             <p className="text-sm">Preview not available for this file type.</p>
-            <a href={url} download target="_blank" rel="noreferrer"
+            <button type="button" onClick={handleDownload}
               className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-600 hover:border-blue-300 hover:text-blue-600">
               <Download size={13} /> Download to view
-            </a>
+            </button>
           </div>
         ) : (
           <div className="flex h-full items-center justify-center text-sm text-slate-300">
             No file attached
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ── Document editor modal ─────────────────────────────────────────────────────
+const EDITOR_STYLES = `
+  .kb-editor { font-size: 14px; line-height: 1.65; color: #1e293b; }
+  .kb-editor:focus { outline: none; }
+  .kb-editor:empty:before { content: attr(data-placeholder); color: #94a3b8; pointer-events: none; }
+  .kb-editor h1 { font-size: 1.75em; font-weight: 700; margin: 0.75em 0 0.25em; }
+  .kb-editor h2 { font-size: 1.4em;  font-weight: 600; margin: 0.75em 0 0.25em; }
+  .kb-editor h3 { font-size: 1.2em;  font-weight: 600; margin: 0.75em 0 0.25em; }
+  .kb-editor p  { margin: 0.4em 0; min-height: 1.4em; }
+  .kb-editor ul { list-style: disc;    padding-left: 1.75em; margin: 0.4em 0; }
+  .kb-editor ol { list-style: decimal; padding-left: 1.75em; margin: 0.4em 0; }
+  .kb-editor li { margin: 0.15em 0; }
+  .kb-editor blockquote { border-left: 3px solid #94a3b8; padding-left: 1em; color: #64748b; margin: 0.75em 0; font-style: italic; }
+  .kb-editor a   { color: #2563eb; text-decoration: underline; }
+  .kb-editor code { background: #f1f5f9; padding: 0.1em 0.35em; border-radius: 3px; font-family: monospace; font-size: 0.88em; }
+  .kb-editor pre  { background: #f1f5f9; padding: 1em; border-radius: 6px; overflow-x: auto; font-family: monospace; font-size: 0.85em; margin: 0.5em 0; }
+  .kb-editor img  { max-width: 100%; height: auto; border-radius: 6px; margin: 0.5em 0; }
+  .kb-editor hr   { border: none; border-top: 1px solid #e2e8f0; margin: 1em 0; }
+`;
+
+function TBtn({ label, title, onMouseDown, className, icon: Icon }) {
+  return (
+    <button
+      type="button"
+      title={title}
+      onMouseDown={onMouseDown}
+      className={cn(
+        'flex h-7 min-w-[1.75rem] items-center justify-center gap-1 rounded px-1.5 text-[11px] font-medium text-slate-600 transition-colors hover:bg-slate-200 hover:text-slate-900',
+        className
+      )}
+    >
+      {Icon ? <Icon size={13} /> : label}
+    </button>
+  );
+}
+
+function CreateDocumentModal({ groups, activeGroup, onCreate, onClose }) {
+  const [name,        setName]        = useState('');
+  const [description, setDescription] = useState('');
+  const [groupId,     setGroupId]     = useState(activeGroup ?? '');
+  const [mode,        setMode]        = useState('rich'); // 'rich' | 'html'
+  const [htmlSource,  setHtmlSource]  = useState('');
+  const [saving,      setSaving]      = useState(false);
+  const editorRef = useRef(null);
+
+  const exec = useCallback((cmd, value = null) => {
+    document.execCommand(cmd, false, value);
+    editorRef.current?.focus();
+  }, []);
+
+  const switchMode = (next) => {
+    if (next === 'html') {
+      setHtmlSource(editorRef.current?.innerHTML ?? '');
+    } else if (next === 'rich' && editorRef.current) {
+      editorRef.current.innerHTML = htmlSource;
+    }
+    setMode(next);
+  };
+
+  const insertLink = () => {
+    const selection = window.getSelection();
+    const selectedText = selection?.toString() ?? '';
+    const url = window.prompt('URL:', 'https://');
+    if (url) exec('createLink', url);
+  };
+
+  const getHtml = () => mode === 'rich' ? (editorRef.current?.innerHTML ?? '') : htmlSource;
+
+  const save = async () => {
+    const html = getHtml();
+    if (!name.trim() && !html.replace(/<[^>]*>/g, '').trim()) return;
+    setSaving(true);
+    try {
+      await onCreate({ name: name.trim() || 'Untitled', description: description.trim(), groupId, html });
+      onClose();
+    } catch { setSaving(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+
+      <style>{EDITOR_STYLES}</style>
+
+      <div className="flex h-[88vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+
+        {/* Header */}
+        <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-5 py-3.5">
+          <div className="flex items-center gap-2">
+            <FilePlus size={16} className="text-blue-600" />
+            <h2 className="text-sm font-semibold text-slate-900">New Document</h2>
+          </div>
+          <button type="button" onClick={onClose}
+            className="rounded-lg p-1 text-slate-400 hover:bg-slate-100"><X size={15} /></button>
+        </div>
+
+        {/* Fields */}
+        <div className="flex shrink-0 items-center gap-3 border-b border-slate-100 px-5 py-2.5">
+          <input
+            autoFocus
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Document title"
+            className="flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20 placeholder:text-slate-300 placeholder:font-normal"
+          />
+          {groups.length > 0 && (
+            <select
+              value={groupId}
+              onChange={(e) => setGroupId(e.target.value)}
+              className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-blue-400"
+            >
+              <option value="">No group</option>
+              {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+            </select>
+          )}
+        </div>
+
+        {/* Toolbar */}
+        <div className="flex shrink-0 flex-wrap items-center gap-0.5 border-b border-slate-100 bg-slate-50 px-3 py-1.5">
+          <TBtn label="B"  title="Bold"      className="font-bold"   onMouseDown={(e) => { e.preventDefault(); exec('bold'); }} />
+          <TBtn label="I"  title="Italic"    className="italic"      onMouseDown={(e) => { e.preventDefault(); exec('italic'); }} />
+          <TBtn label="U"  title="Underline" className="underline"   onMouseDown={(e) => { e.preventDefault(); exec('underline'); }} />
+
+          <span className="mx-1 h-5 w-px bg-slate-200" />
+
+          <TBtn label="H1" title="Heading 1" onMouseDown={(e) => { e.preventDefault(); exec('formatBlock', 'H1'); }} />
+          <TBtn label="H2" title="Heading 2" onMouseDown={(e) => { e.preventDefault(); exec('formatBlock', 'H2'); }} />
+          <TBtn label="H3" title="Heading 3" onMouseDown={(e) => { e.preventDefault(); exec('formatBlock', 'H3'); }} />
+          <TBtn label="¶"  title="Paragraph" onMouseDown={(e) => { e.preventDefault(); exec('formatBlock', 'P'); }} />
+
+          <span className="mx-1 h-5 w-px bg-slate-200" />
+
+          <TBtn title="Bullet list"   icon={List}         onMouseDown={(e) => { e.preventDefault(); exec('insertUnorderedList'); }} />
+          <TBtn title="Numbered list" icon={ListOrdered}  onMouseDown={(e) => { e.preventDefault(); exec('insertOrderedList'); }} />
+
+          <span className="mx-1 h-5 w-px bg-slate-200" />
+
+          <TBtn label="❝"  title="Block quote" onMouseDown={(e) => { e.preventDefault(); exec('formatBlock', 'BLOCKQUOTE'); }} />
+          <TBtn title="Link" icon={Link2} onMouseDown={(e) => { e.preventDefault(); insertLink(); }} />
+
+          <span className="mx-1 h-5 w-px bg-slate-200" />
+
+          <TBtn label="×fmt" title="Remove formatting" onMouseDown={(e) => { e.preventDefault(); exec('removeFormat'); }} />
+
+          {/* Mode toggle */}
+          <div className="ml-auto flex items-center rounded-lg border border-slate-200 bg-white p-0.5">
+            <button type="button" onClick={() => switchMode('rich')}
+              className={cn('rounded px-2 py-0.5 text-[11px] font-medium transition-colors',
+                mode === 'rich' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-800')}>
+              Rich
+            </button>
+            <button type="button" onClick={() => switchMode('html')}
+              className={cn('rounded px-2 py-0.5 text-[11px] font-medium transition-colors',
+                mode === 'html' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-800')}>
+              HTML
+            </button>
+          </div>
+        </div>
+
+        {/* Editor area */}
+        <div className="min-h-0 flex-1 overflow-y-auto p-6">
+          {mode === 'rich' ? (
+            <div
+              ref={editorRef}
+              contentEditable
+              suppressContentEditableWarning
+              className="kb-editor min-h-full"
+              data-placeholder="Start typing your document… paste text, images, or HTML directly here."
+            />
+          ) : (
+            <textarea
+              value={htmlSource}
+              onChange={(e) => setHtmlSource(e.target.value)}
+              className="h-full min-h-[400px] w-full resize-none font-mono text-xs leading-relaxed text-slate-700 outline-none"
+              placeholder="<h1>Title</h1><p>Paste or write HTML here…</p>"
+            />
+          )}
+        </div>
+
+        {/* Optional description */}
+        <div className="shrink-0 border-t border-slate-100 px-5 py-2">
+          <input
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Short description (optional) — shown on document cards"
+            className="w-full text-xs text-slate-500 outline-none placeholder:text-slate-300"
+          />
+        </div>
+
+        {/* Footer */}
+        <div className="flex shrink-0 items-center justify-end gap-2 border-t border-slate-200 px-5 py-3">
+          <button type="button" onClick={onClose}
+            className="rounded-xl border border-slate-200 px-4 py-1.5 text-sm text-slate-500 hover:bg-slate-50">
+            Cancel
+          </button>
+          <button type="button" onClick={save} disabled={saving}
+            className="flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60">
+            {saving ? <Loader2 size={13} className="animate-spin" /> : <FilePlus size={13} />}
+            {saving ? 'Saving…' : 'Save Document'}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -659,7 +879,7 @@ function KnowledgeContent() {
   const {
     groups, documents, loading, uploads,
     searchQuery, searchResults, searchLoading,
-    search, uploadDocuments,
+    search, uploadDocuments, createDocument,
     createGroup, updateGroup, deleteGroup,
     updateDocument, deleteDocument,
     getSignedUrl,
@@ -672,6 +892,7 @@ function KnowledgeContent() {
   const [uploadOpen,    setUploadOpen]    = useState(false);
   const [isDropTarget,  setIsDropTarget]  = useState(false);
   const [viewMode,      setViewMode]      = useState('cards'); // 'cards' | 'details'
+  const [createOpen,    setCreateOpen]    = useState(false);
   const [drawerWidth,  setDrawerWidth]  = useState(420);
   const [isResizing,   setIsResizing]   = useState(false);
 
@@ -857,6 +1078,13 @@ function KnowledgeContent() {
 
           <button
             type="button"
+            onClick={() => setCreateOpen(true)}
+            className="flex shrink-0 items-center gap-1.5 rounded-xl bg-blue-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+          >
+            <FilePlus size={14} /> New
+          </button>
+          <button
+            type="button"
             onClick={() => setUploadOpen(true)}
             className="flex shrink-0 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:border-blue-300 hover:text-blue-600"
           >
@@ -1005,6 +1233,16 @@ function KnowledgeContent() {
           groups={groups}
           onUpload={uploadDocuments}
           onClose={() => setUploadOpen(false)}
+        />
+      )}
+
+      {/* Create document modal */}
+      {createOpen && (
+        <CreateDocumentModal
+          groups={groups}
+          activeGroup={activeGroup}
+          onCreate={createDocument}
+          onClose={() => setCreateOpen(false)}
         />
       )}
     </div>

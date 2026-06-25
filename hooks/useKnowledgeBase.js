@@ -199,6 +199,39 @@ export function useKnowledgeBase(session, company) {
     await refresh();
   }, [supabase, refresh, search, searchQuery]);
 
+  const createDocument = useCallback(async ({ name, groupId, description, html }) => {
+    if (!supabase || !company?.id) return;
+
+    const uid = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const filePath = `${company.id}/${uid}.html`;
+    const blob = new Blob([html], { type: 'text/html' });
+
+    const { error: upErr } = await supabase.storage.from(BUCKET).upload(filePath, blob, {
+      contentType: 'text/html',
+    });
+    if (upErr) throw upErr;
+
+    let contentText = '';
+    try {
+      const parsed = new DOMParser().parseFromString(html, 'text/html');
+      parsed.querySelectorAll('script,style').forEach((el) => el.remove());
+      contentText = (parsed.body?.innerText ?? parsed.body?.textContent ?? '').replace(/\s+/g, ' ').trim();
+    } catch {}
+
+    const { error: dbErr } = await supabase.from('kb_documents').insert({
+      company_id:   company.id,
+      group_id:     groupId || null,
+      name:         name || 'Untitled',
+      description:  description || null,
+      file_path:    filePath,
+      file_type:    'html',
+      file_size:    blob.size,
+      content_text: contentText || null,
+    });
+    if (dbErr) throw dbErr;
+    await refresh();
+  }, [supabase, company, refresh]);
+
   const deleteDocument = useCallback(async (id) => {
     if (!supabase) return;
     const doc = documents.find((d) => d.id === id);
@@ -215,7 +248,7 @@ export function useKnowledgeBase(session, company) {
     uploads,
     searchQuery, searchResults, searchLoading,
     search, refresh,
-    uploadDocuments,
+    uploadDocuments, createDocument,
     createGroup, updateGroup, deleteGroup,
     updateDocument, deleteDocument,
     getSignedUrl,
