@@ -85,7 +85,7 @@ function Calculator() {
   const { projects: psaProjects, createProject: createPSAProject } = usePSAProjects(session, company, user);
 
   const [toProjectOpen,  setToProjectOpen]  = useState(false);
-  const [psaProjectId,   setPsaProjectId]   = useState(null);
+  const [newPsaProjectId, setNewPsaProjectId] = useState(null);
   const [toProjectBusy,  setToProjectBusy]  = useState(false);
   const [toProjectForm,  setToProjectForm]  = useState({ name: '', customer_name: '', start_date: '', budget: '' });
 
@@ -192,7 +192,7 @@ function Calculator() {
   }, [inputs, cameraInputs, priceOverrides, serviceOverrides, customLineItems, laborRoles, savedSnapshot]);
 
   const selectProject = (id) => {
-    setPsaProjectId(null);
+    setNewPsaProjectId(null);
     if (!id) {
       setInputs(DEFAULT_INPUTS);
       setCameraInputs(DEFAULT_CAMERA_INPUTS);
@@ -332,33 +332,33 @@ function Calculator() {
             >
               <Save size={14} /> {currentProjectId ? 'Update Project' : 'Save Project'}
             </Button>
-            {currentProjectId && (
-              psaProjectId
-                ? (
-                  <a href={`/projects/${psaProjectId}`}
-                    className="flex h-8 items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 text-xs font-medium text-emerald-700 hover:bg-emerald-100 transition-colors">
-                    <CheckCircle2 size={13} /> View Project
-                  </a>
-                ) : (
-                  <button type="button"
-                    onClick={() => {
-                      const quote = projects.find((p) => p.id === currentProjectId);
-                      const account = crmAccounts.find((a) => a.id === currentCrmAccountId);
-                      const existingPsa = psaProjects.find((p) => p.quote_id === currentProjectId);
-                      if (existingPsa) { setPsaProjectId(existingPsa.id); return; }
-                      setToProjectForm({
-                        name: quote?.project_name ?? inputs.propertyName ?? '',
-                        customer_name: account?.name ?? '',
-                        start_date: '',
-                        budget: String(Math.round((bom.grandTotalPrice ?? 0) + (cameraBom.grandTotalPrice ?? 0))),
-                      });
-                      setToProjectOpen(true);
-                    }}
-                    className="flex h-8 items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 text-xs font-medium text-violet-700 hover:bg-violet-100 transition-colors">
-                    <FolderKanban size={13} /> → Project
-                  </button>
-                )
-            )}
+            {currentProjectId && (() => {
+              const linkedProject = newPsaProjectId
+                ? { id: newPsaProjectId }
+                : psaProjects.find((p) => p.quote_id === currentProjectId);
+              return linkedProject ? (
+                <a href={`/projects/${linkedProject.id}`}
+                  className="flex h-8 items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 text-xs font-medium text-emerald-700 hover:bg-emerald-100 transition-colors">
+                  <CheckCircle2 size={13} /> View Project
+                </a>
+              ) : (
+                <button type="button"
+                  onClick={() => {
+                    const quote   = projects.find((p) => p.id === currentProjectId);
+                    const account = crmAccounts.find((a) => a.id === currentCrmAccountId);
+                    setToProjectForm({
+                      name:          quote?.project_name ?? inputs.propertyName ?? '',
+                      customer_name: account?.name ?? '',
+                      start_date:    '',
+                      budget:        String(Math.round((bom.grandTotalPrice ?? 0) + (cameraBom.grandTotalPrice ?? 0))),
+                    });
+                    setToProjectOpen(true);
+                  }}
+                  className="flex h-8 items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 text-xs font-medium text-violet-700 hover:bg-violet-100 transition-colors">
+                  <FolderKanban size={13} /> → Project
+                </button>
+              );
+            })()}
             <Button variant="outline" size="sm" onClick={handleExportCSV}>
               <Sheet size={14} /> CSV
             </Button>
@@ -585,10 +585,9 @@ function Calculator() {
                       start_date:    toProjectForm.start_date || null,
                       budget:        toProjectForm.budget ? Number(toProjectForm.budget) : null,
                       quote_id:      currentProjectId,
-                      crm_account_id: currentCrmAccountId || null,
                       status:        'planning',
                     });
-                    setPsaProjectId(proj.id);
+                    setNewPsaProjectId(proj.id);
                     setToProjectOpen(false);
                   } catch (e) { alert(e.message); }
                   finally { setToProjectBusy(false); }
