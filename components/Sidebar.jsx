@@ -13,6 +13,7 @@ import {
   LogOut,
   Layers,
   LayoutTemplate,
+  Receipt,
 } from 'lucide-react';
 import { useSession } from '@/components/SessionProvider';
 import { useModules } from '@/hooks/useModules';
@@ -25,6 +26,7 @@ const NAV_ITEMS = [
   { key: 'projects',   label: 'Projects',        href: '/projects',   icon: FolderKanban },
   { key: 'templates',  label: 'Templates',       href: '/templates',  icon: LayoutTemplate },
   { key: 'support',    label: 'Support',         href: '/support',    icon: LifeBuoy },
+  { key: 'invoices',   label: 'Invoices',        href: '/invoices',   icon: Receipt  },
   { key: 'resources',  label: 'Resources',       href: '/resources',  icon: BookOpen },
 ];
 

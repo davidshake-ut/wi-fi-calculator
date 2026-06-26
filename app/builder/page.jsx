@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { getSupabase } from '@/lib/supabase/client';
-import { FileDown, FileText, Sheet, Save, Settings } from 'lucide-react';
+import { FileDown, FileText, Sheet, Save, Settings, FolderKanban, CheckCircle2, X, Loader2 } from 'lucide-react';
 import AuthGuard from '@/components/AuthGuard';
 import OSShell from '@/components/OSShell';
 import { useSession } from '@/components/SessionProvider';
@@ -25,6 +25,7 @@ import { calculateLabor } from '@/lib/calculateLabor';
 import { estimateLaborHours } from '@/lib/estimateLaborHours';
 import { useProducts } from '@/hooks/useProducts';
 import { useProjects } from '@/hooks/useProjects';
+import { usePSAProjects } from '@/hooks/usePSAProjects';
 import { useCRMAccounts } from '@/hooks/useCRMAccounts';
 import { DEFAULT_INPUTS, DEFAULT_CAMERA_INPUTS, DEFAULT_LABOR_ROLES } from '@/lib/defaults';
 import { getTerminology } from '@/lib/terminology';
@@ -81,6 +82,12 @@ function Calculator() {
     { teamFilter: catalogTeamId }
   );
   const { projects, loadProject, saveProject, deleteProject } = useProjects(session, company, user);
+  const { projects: psaProjects, createProject: createPSAProject } = usePSAProjects(session, company, user);
+
+  const [toProjectOpen,  setToProjectOpen]  = useState(false);
+  const [psaProjectId,   setPsaProjectId]   = useState(null);
+  const [toProjectBusy,  setToProjectBusy]  = useState(false);
+  const [toProjectForm,  setToProjectForm]  = useState({ name: '', customer_name: '', start_date: '', budget: '' });
 
   const canManageCatalog = configured
     ? (role === 'company_admin' || isSuperAdmin) &&
@@ -185,6 +192,7 @@ function Calculator() {
   }, [inputs, cameraInputs, priceOverrides, serviceOverrides, customLineItems, laborRoles, savedSnapshot]);
 
   const selectProject = (id) => {
+    setPsaProjectId(null);
     if (!id) {
       setInputs(DEFAULT_INPUTS);
       setCameraInputs(DEFAULT_CAMERA_INPUTS);
@@ -324,6 +332,33 @@ function Calculator() {
             >
               <Save size={14} /> {currentProjectId ? 'Update Project' : 'Save Project'}
             </Button>
+            {currentProjectId && (
+              psaProjectId
+                ? (
+                  <a href={`/projects/${psaProjectId}`}
+                    className="flex h-8 items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 text-xs font-medium text-emerald-700 hover:bg-emerald-100 transition-colors">
+                    <CheckCircle2 size={13} /> View Project
+                  </a>
+                ) : (
+                  <button type="button"
+                    onClick={() => {
+                      const quote = projects.find((p) => p.id === currentProjectId);
+                      const account = crmAccounts.find((a) => a.id === currentCrmAccountId);
+                      const existingPsa = psaProjects.find((p) => p.quote_id === currentProjectId);
+                      if (existingPsa) { setPsaProjectId(existingPsa.id); return; }
+                      setToProjectForm({
+                        name: quote?.project_name ?? inputs.propertyName ?? '',
+                        customer_name: account?.name ?? '',
+                        start_date: '',
+                        budget: String(Math.round((bom.grandTotalPrice ?? 0) + (cameraBom.grandTotalPrice ?? 0))),
+                      });
+                      setToProjectOpen(true);
+                    }}
+                    className="flex h-8 items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 text-xs font-medium text-violet-700 hover:bg-violet-100 transition-colors">
+                    <FolderKanban size={13} /> → Project
+                  </button>
+                )
+            )}
             <Button variant="outline" size="sm" onClick={handleExportCSV}>
               <Sheet size={14} /> CSV
             </Button>
@@ -490,6 +525,81 @@ function Calculator() {
           }}
           onClose={() => setSettingsOpen(false)}
         />
+      )}
+
+      {/* Convert proposal → PSA project modal */}
+      {toProjectOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4 backdrop-blur-sm"
+          onClick={(e) => { if (e.target === e.currentTarget) setToProjectOpen(false); }}>
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+              <div className="flex items-center gap-2">
+                <FolderKanban size={16} className="text-violet-600" />
+                <h2 className="text-sm font-semibold text-slate-900">Create Project from Proposal</h2>
+              </div>
+              <button type="button" onClick={() => setToProjectOpen(false)}
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100"><X size={15} /></button>
+            </div>
+            <div className="space-y-4 p-6">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-700">Project Name *</label>
+                <input autoFocus value={toProjectForm.name}
+                  onChange={(e) => setToProjectForm((f) => ({ ...f, name: e.target.value }))}
+                  className="h-9 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20" />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-700">Customer</label>
+                <input value={toProjectForm.customer_name}
+                  onChange={(e) => setToProjectForm((f) => ({ ...f, customer_name: e.target.value }))}
+                  className="h-9 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-blue-400" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-700">Start Date</label>
+                  <input type="date" value={toProjectForm.start_date}
+                    onChange={(e) => setToProjectForm((f) => ({ ...f, start_date: e.target.value }))}
+                    className="h-9 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-blue-400" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-700">Budget</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">$</span>
+                    <input type="number" min="0" value={toProjectForm.budget}
+                      onChange={(e) => setToProjectForm((f) => ({ ...f, budget: e.target.value }))}
+                      className="h-9 w-full rounded-lg border border-slate-200 pl-6 pr-3 text-sm tabular-nums outline-none focus:border-blue-400" />
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 border-t border-slate-100 px-6 py-3">
+              <button type="button" onClick={() => setToProjectOpen(false)}
+                className="rounded-xl border border-slate-200 px-4 py-1.5 text-sm text-slate-500 hover:bg-slate-50">Cancel</button>
+              <button type="button" disabled={toProjectBusy || !toProjectForm.name.trim()}
+                onClick={async () => {
+                  if (!toProjectForm.name.trim()) return;
+                  setToProjectBusy(true);
+                  try {
+                    const proj = await createPSAProject({
+                      name:          toProjectForm.name.trim(),
+                      customer_name: toProjectForm.customer_name.trim() || null,
+                      start_date:    toProjectForm.start_date || null,
+                      budget:        toProjectForm.budget ? Number(toProjectForm.budget) : null,
+                      quote_id:      currentProjectId,
+                      crm_account_id: currentCrmAccountId || null,
+                      status:        'planning',
+                    });
+                    setPsaProjectId(proj.id);
+                    setToProjectOpen(false);
+                  } catch (e) { alert(e.message); }
+                  finally { setToProjectBusy(false); }
+                }}
+                className="flex items-center gap-1.5 rounded-xl bg-violet-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-60">
+                {toProjectBusy ? <Loader2 size={13} className="animate-spin" /> : <FolderKanban size={13} />}
+                {toProjectBusy ? 'Creating…' : 'Create Project'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
