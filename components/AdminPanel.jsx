@@ -435,7 +435,7 @@ export default function AdminPanel() {
         <p className="mt-1 text-sm text-slate-500">
           {isSuperAdmin
             ? 'Manage teams, configure modules, and set team branding across the platform.'
-            : 'Configure your team's branding, modules, and members.'}
+            : "Configure your team's branding, modules, and members."}
         </p>
       </div>
 
