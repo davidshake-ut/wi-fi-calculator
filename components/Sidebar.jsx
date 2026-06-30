@@ -85,7 +85,7 @@ export default function Sidebar() {
           <NavLink
             href="/admin"
             icon={Shield}
-            label={isSuperAdmin ? 'Teams' : 'Team'}
+            label={isSuperAdmin ? 'Platform Settings' : 'Settings'}
             active={pathname === '/admin'}
           />
         )}
