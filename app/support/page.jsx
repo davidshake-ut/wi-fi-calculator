@@ -11,6 +11,7 @@ import { useCRMAccounts } from '@/hooks/useCRMAccounts';
 import NewTicketModal from '@/components/support/NewTicketModal';
 import TicketPriorityBadge, { TicketStatusBadge, STATUS_CONFIG } from '@/components/support/TicketPriorityBadge';
 import { Card, Button } from '@/components/ui/primitives';
+import ConfirmModal from '@/components/ui/ConfirmModal';
 import { cn } from '@/lib/utils';
 
 const ALL_STATUSES = Object.keys(STATUS_CONFIG);
@@ -32,6 +33,7 @@ function SupportContent() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [modalOpen, setModalOpen] = useState(false);
   const [deleting, setDeleting] = useState(null);
+  const [confirmState, setConfirmState] = useState(null);
 
   const filtered = statusFilter === 'all' ? tickets : tickets.filter((t) => t.status === statusFilter);
 
@@ -46,10 +48,15 @@ function SupportContent() {
     resolved: tickets.filter((t) => t.status === 'resolved').length,
   };
 
-  const handleDelete = async (t) => {
-    if (!confirm(`Delete ticket "${t.title}"?`)) return;
-    setDeleting(t.id);
-    try { await deleteTicket(t.id); } finally { setDeleting(null); }
+  const handleDelete = (t) => {
+    setConfirmState({
+      title: 'Delete ticket',
+      message: `Delete ticket "${t.title}"? This cannot be undone.`,
+      onConfirm: async () => {
+        setDeleting(t.id);
+        try { await deleteTicket(t.id); } finally { setDeleting(null); }
+      },
+    });
   };
 
   return (
@@ -127,6 +134,13 @@ function SupportContent() {
       )}
 
       <NewTicketModal open={modalOpen} onClose={() => setModalOpen(false)} onSave={createTicket} accounts={accounts} />
+      <ConfirmModal
+        open={!!confirmState}
+        title={confirmState?.title}
+        message={confirmState?.message}
+        onConfirm={() => { confirmState?.onConfirm(); setConfirmState(null); }}
+        onCancel={() => setConfirmState(null)}
+      />
     </div>
   );
 }

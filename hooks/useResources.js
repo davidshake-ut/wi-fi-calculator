@@ -70,6 +70,7 @@ export function useResources(session, company, user) {
     const { data } = await supabase
       .from('resources')
       .select('*')
+      .eq('company_id', companyId)
       .order('category')
       .order('title');
     setRemoteResources(data ?? []);

@@ -24,6 +24,7 @@ import { useInvoices } from '@/hooks/useInvoices';
 import ProjectStatusBadge, { STATUS_CONFIG } from '@/components/projects/ProjectStatusBadge';
 import NewProjectModal from '@/components/projects/NewProjectModal';
 import { Card, Button } from '@/components/ui/primitives';
+import ConfirmModal from '@/components/ui/ConfirmModal';
 import { cn } from '@/lib/utils';
 
 const ALL_STATUSES = Object.keys(STATUS_CONFIG);
@@ -53,6 +54,7 @@ function CreateInvoiceModal({ project, onSave, onClose }) {
     notes:        '',
   });
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   const subtotal   = form.line_items.reduce((s, i) => s + (Number(i.total) || 0), 0);
   const tax_amount = subtotal * (Number(form.tax_rate) || 0) / 100;
@@ -61,10 +63,11 @@ function CreateInvoiceModal({ project, onSave, onClose }) {
   const submit = async (e) => {
     e.preventDefault();
     setSaving(true);
+    setError('');
     try {
       await onSave({ ...form, subtotal, tax_amount, total, project_id: project.id, quote_id: project.quote_id ?? null, crm_account_id: project.crm_account_id ?? null });
       onClose();
-    } catch (err) { alert(err.message); setSaving(false); }
+    } catch (err) { setError(err.message); setSaving(false); }
   };
 
   const fmtMoney = (n) => `$${Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -124,6 +127,7 @@ function CreateInvoiceModal({ project, onSave, onClose }) {
             <span className="text-sm font-bold tabular-nums text-slate-900">{fmtMoney(total)}</span>
           </div>
         </div>
+        {error && <p className="px-6 pb-2 text-xs text-red-600">{error}</p>}
         <div className="flex items-center justify-end gap-2 border-t border-slate-100 px-6 py-3">
           <button type="button" onClick={onClose}
             className="rounded-xl border border-slate-200 px-4 py-1.5 text-sm text-slate-500 hover:bg-slate-50">Cancel</button>
@@ -148,15 +152,21 @@ function ProjectsContent() {
   const [modalOpen,     setModalOpen]     = useState(false);
   const [deleting,      setDeleting]      = useState(null);
   const [invoiceTarget, setInvoiceTarget] = useState(null);
+  const [confirmState,  setConfirmState]  = useState(null);
 
   const filtered = statusFilter === 'all'
     ? projects
     : projects.filter((p) => p.status === statusFilter);
 
-  const handleDelete = async (p) => {
-    if (!confirm(`Delete project "${p.name}"? This will also remove all its tasks and time entries.`)) return;
-    setDeleting(p.id);
-    try { await deleteProject(p.id); } finally { setDeleting(null); }
+  const handleDelete = (p) => {
+    setConfirmState({
+      title: 'Delete project',
+      message: `Delete "${p.name}"? This will also remove all its tasks and time entries.`,
+      onConfirm: async () => {
+        setDeleting(p.id);
+        try { await deleteProject(p.id); } finally { setDeleting(null); }
+      },
+    });
   };
 
   const counts = ALL_STATUSES.reduce((acc, s) => {
@@ -293,6 +303,13 @@ function ProjectsContent() {
           onClose={() => setInvoiceTarget(null)}
         />
       )}
+      <ConfirmModal
+        open={!!confirmState}
+        title={confirmState?.title}
+        message={confirmState?.message}
+        onConfirm={() => { confirmState?.onConfirm(); setConfirmState(null); }}
+        onCancel={() => setConfirmState(null)}
+      />
     </div>
   );
 }

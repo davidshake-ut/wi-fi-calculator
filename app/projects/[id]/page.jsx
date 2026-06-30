@@ -19,6 +19,7 @@ import TimeLog from '@/components/projects/TimeLog';
 import ProjectBudget from '@/components/projects/ProjectBudget';
 import ApplyTemplateModal from '@/components/projects/ApplyTemplateModal';
 import { Select, Button } from '@/components/ui/primitives';
+import ConfirmModal from '@/components/ui/ConfirmModal';
 import { TECHNOLOGIES } from '@/lib/templates/index';
 import { cn } from '@/lib/utils';
 import { useRoleColors } from '@/hooks/useRoleColors';
@@ -82,6 +83,7 @@ function EditableTechName({ value, onSave }) {
 // Small inline dropdown for "Merge into another section"
 function MergeMenu({ tech, others, onMerge }) {
   const [open, setOpen] = useState(false);
+  const [confirmState, setConfirmState] = useState(null);
   if (others.length === 0) return null;
   return (
     <div className="relative">
@@ -104,10 +106,13 @@ function MergeMenu({ tech, others, onMerge }) {
               key={o.id}
               type="button"
               onClick={() => {
-                if (confirm(`Merge "${tech.technology}" into "${o.technology}"? All phases and tasks will move.`)) {
-                  onMerge(tech.id, o.id);
-                  setOpen(false);
-                }
+                setOpen(false);
+                setConfirmState({
+                  title: 'Merge sections',
+                  message: `Merge "${tech.technology}" into "${o.technology}"? All phases and tasks will move.`,
+                  confirmLabel: 'Merge',
+                  onConfirm: () => onMerge(tech.id, o.id),
+                });
               }}
               className="w-full truncate rounded-lg px-2 py-1.5 text-left text-xs text-slate-700 hover:bg-slate-100"
             >
@@ -116,6 +121,15 @@ function MergeMenu({ tech, others, onMerge }) {
           ))}
         </div>
       )}
+      <ConfirmModal
+        open={!!confirmState}
+        title={confirmState?.title}
+        message={confirmState?.message}
+        confirmLabel={confirmState?.confirmLabel}
+        variant="default"
+        onConfirm={() => { confirmState?.onConfirm(); setConfirmState(null); }}
+        onCancel={() => setConfirmState(null)}
+      />
     </div>
   );
 }
@@ -143,6 +157,7 @@ function ProjectDetail() {
   const [applyModal, setApplyModal] = useState(null);
   const [addingTech, setAddingTech] = useState(false);
   const [collapsedTechs, setCollapsedTechs] = useState(new Set());
+  const [confirmState, setConfirmState] = useState(null);
 
   const toggleTech = (techId) =>
     setCollapsedTechs((prev) => {
@@ -318,10 +333,12 @@ function ProjectDetail() {
                       {/* Remove section */}
                       <button
                         type="button"
-                        onClick={() => {
-                          if (confirm(`Remove the "${tech.technology}" section? Tasks will become unassigned.`))
-                            deleteTechnology(tech.id);
-                        }}
+                        onClick={() => setConfirmState({
+                          title: 'Remove section',
+                          message: `Remove the "${tech.technology}" section? Tasks will become unassigned.`,
+                          confirmLabel: 'Remove',
+                          onConfirm: () => deleteTechnology(tech.id),
+                        })}
                         className="ml-auto rounded p-1 text-slate-300 hover:text-red-500 transition-colors"
                         title="Remove section"
                       >
@@ -496,6 +513,14 @@ function ProjectDetail() {
           </div>
         )}
       </div>
+      <ConfirmModal
+        open={!!confirmState}
+        title={confirmState?.title}
+        message={confirmState?.message}
+        confirmLabel={confirmState?.confirmLabel}
+        onConfirm={() => { confirmState?.onConfirm(); setConfirmState(null); }}
+        onCancel={() => setConfirmState(null)}
+      />
     </div>
   );
 }

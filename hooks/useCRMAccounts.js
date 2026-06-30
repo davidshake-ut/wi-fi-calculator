@@ -19,6 +19,7 @@ export function useCRMAccounts(session, company, user) {
     const { data } = await supabase
       .from('crm_accounts')
       .select('*')
+      .eq('company_id', companyId)
       .order('name');
     setRemoteAccounts(data ?? []);
     setLoading(false);

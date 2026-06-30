@@ -12,6 +12,7 @@ import OSShell from '@/components/OSShell';
 import { useSession } from '@/components/SessionProvider';
 import { useResources } from '@/hooks/useResources';
 import { cn } from '@/lib/utils';
+import ConfirmModal from '@/components/ui/ConfirmModal';
 
 // ── File-type metadata (for uploaded/created files) ───────────────────────
 const FILE_META = {
@@ -199,7 +200,7 @@ function ResourceCard({ resource: r, onClick, onDelete, onMove, categories }) {
             ))}
             <div className="my-1 border-t border-slate-100" />
             <button type="button"
-              onClick={() => { if (confirm(`Delete "${r.title}"?`)) { onDelete(r.id); setMenuOpen(false); } }}
+              onClick={() => { onDelete(r.id, r.title); setMenuOpen(false); }}
               className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs text-red-600 hover:bg-red-50">
               <Trash2 size={11} /> Delete
             </button>
@@ -275,7 +276,7 @@ function ResourceRow({ resource: r, onClick, onDelete, onMove, categories }) {
             ))}
             <div className="my-1 border-t border-slate-100" />
             <button type="button"
-              onClick={() => { if (confirm(`Delete "${r.title}"?`)) { onDelete(r.id); setMenuOpen(false); } }}
+              onClick={() => { onDelete(r.id, r.title); setMenuOpen(false); }}
               className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs text-red-600 hover:bg-red-50">
               <Trash2 size={11} /> Delete
             </button>
@@ -757,6 +758,15 @@ function ResourcesContent() {
   const [isDropTarget,   setIsDropTarget]   = useState(false);
   const [drawerWidth,    setDrawerWidth]    = useState(460);
   const [isResizing,     setIsResizing]     = useState(false);
+  const [confirmState,   setConfirmState]   = useState(null);
+
+  const handleDeleteResource = (id, title) => {
+    setConfirmState({
+      title: 'Delete resource',
+      message: `Delete "${title}"? This cannot be undone.`,
+      onConfirm: () => deleteResource(id),
+    });
+  };
 
   const searchRef = useRef(null);
   const dragRef   = useRef(null);
@@ -956,7 +966,7 @@ function ResourcesContent() {
                     {visibleResources.map((r) => (
                       <ResourceCard key={r.id} resource={r}
                         onClick={() => setSelectedItem(r)}
-                        onDelete={deleteResource}
+                        onDelete={handleDeleteResource}
                         onMove={(id, cat) => updateResource(id, { category: cat })}
                         categories={categories} />
                     ))}
@@ -976,7 +986,7 @@ function ResourcesContent() {
                     {visibleResources.map((r) => (
                       <ResourceRow key={r.id} resource={r}
                         onClick={() => setSelectedItem(r)}
-                        onDelete={deleteResource}
+                        onDelete={handleDeleteResource}
                         onMove={(id, cat) => updateResource(id, { category: cat })}
                         categories={categories} />
                     ))}
@@ -1015,6 +1025,13 @@ function ResourcesContent() {
       {addLinkOpen && (
         <AddLinkModal existingCategories={categories} onSave={createResource} onClose={() => setAddLinkOpen(false)} />
       )}
+      <ConfirmModal
+        open={!!confirmState}
+        title={confirmState?.title}
+        message={confirmState?.message}
+        onConfirm={() => { confirmState?.onConfirm(); setConfirmState(null); }}
+        onCancel={() => setConfirmState(null)}
+      />
     </div>
   );
 }

@@ -12,6 +12,7 @@ import OSShell from '@/components/OSShell';
 import { useSession } from '@/components/SessionProvider';
 import { useInvoices } from '@/hooks/useInvoices';
 import { cn } from '@/lib/utils';
+import ConfirmModal from '@/components/ui/ConfirmModal';
 
 // ── Status config ─────────────────────────────────────────────────────────
 const STATUS = {
@@ -108,6 +109,7 @@ function InvoiceModal({ initial = {}, onSave, onClose }) {
     crm_account_id:initial.crm_account_id?? null,
   });
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
   const set = useCallback((k, v) => setForm((f) => ({ ...f, [k]: v })), []);
 
   const subtotal   = form.line_items.reduce((s, i) => s + (Number(i.total) || 0), 0);
@@ -118,11 +120,12 @@ function InvoiceModal({ initial = {}, onSave, onClose }) {
     e.preventDefault();
     if (!form.title.trim()) return;
     setSaving(true);
+    setError('');
     try {
       await onSave({ ...form, subtotal, tax_amount, total, tax_rate: Number(form.tax_rate) || 0 });
       onClose();
     } catch (err) {
-      alert(err.message);
+      setError(err.message);
       setSaving(false);
     }
   };
@@ -206,6 +209,7 @@ function InvoiceModal({ initial = {}, onSave, onClose }) {
           </div>
         </div>
 
+        {error && <p className="px-6 pb-2 text-xs text-red-600">{error}</p>}
         {/* Footer */}
         <div className="flex shrink-0 items-center justify-end gap-2 border-t border-slate-200 px-6 py-3">
           <button type="button" onClick={onClose}
@@ -411,7 +415,7 @@ function InvoiceDetail({ invoice: inv, onClose, onUpdate, onDelete }) {
         {/* Footer */}
         <div className="flex shrink-0 items-center justify-between border-t border-slate-200 px-6 py-3">
           <button type="button"
-            onClick={() => { if (confirm(`Delete invoice ${inv.invoice_number}?`)) onDelete(inv.id); }}
+            onClick={() => onDelete(inv.id, inv.invoice_number)}
             className="flex items-center gap-1.5 text-xs text-red-500 hover:text-red-700">
             <Trash2 size={13} /> Delete
           </button>
@@ -432,6 +436,7 @@ function InvoicesContent() {
   const [statusFilter,  setStatusFilter]  = useState('all');
   const [modalOpen,     setModalOpen]     = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
+  const [confirmState, setConfirmState] = useState(null);
 
   const filtered = statusFilter === 'all'
     ? invoices
@@ -442,9 +447,15 @@ function InvoicesContent() {
     return acc;
   }, {});
 
-  const handleDelete = async (id) => {
-    await deleteInvoice(id);
-    setSelectedInvoice(null);
+  const handleDelete = (id, invoiceNumber) => {
+    setConfirmState({
+      title: 'Delete invoice',
+      message: `Delete invoice ${invoiceNumber ?? id}? This cannot be undone.`,
+      onConfirm: async () => {
+        await deleteInvoice(id);
+        setSelectedInvoice(null);
+      },
+    });
   };
 
   return (
@@ -500,8 +511,8 @@ function InvoicesContent() {
           )}
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm shadow-slate-900/[0.03]">
-          <table className="w-full">
+        <div className="overflow-x-auto overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm shadow-slate-900/[0.03]">
+          <table className="w-full min-w-[700px]">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50">
                 {['Invoice #', 'Title', 'Customer', 'Project', 'Total', 'Due Date', 'Status'].map((h) => (
@@ -546,6 +557,13 @@ function InvoicesContent() {
           onDelete={handleDelete}
         />
       )}
+      <ConfirmModal
+        open={!!confirmState}
+        title={confirmState?.title}
+        message={confirmState?.message}
+        onConfirm={() => { confirmState?.onConfirm(); setConfirmState(null); }}
+        onCancel={() => setConfirmState(null)}
+      />
     </div>
   );
 }

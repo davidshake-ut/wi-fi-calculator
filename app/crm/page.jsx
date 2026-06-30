@@ -9,6 +9,7 @@ import { useSession } from '@/components/SessionProvider';
 import { useCRMAccounts } from '@/hooks/useCRMAccounts';
 import NewAccountModal from '@/components/crm/NewAccountModal';
 import { Card, Button } from '@/components/ui/primitives';
+import ConfirmModal from '@/components/ui/ConfirmModal';
 import { cn } from '@/lib/utils';
 
 const TYPE_LABELS = {
@@ -30,6 +31,7 @@ function CRMContent() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [modalOpen, setModalOpen] = useState(false);
   const [deleting, setDeleting] = useState(null);
+  const [confirmState, setConfirmState] = useState(null);
 
   const filtered = accounts.filter((a) => {
     const matchSearch = !search || a.name.toLowerCase().includes(search.toLowerCase());
@@ -37,10 +39,15 @@ function CRMContent() {
     return matchSearch && matchStatus;
   });
 
-  const handleDelete = async (a) => {
-    if (!confirm(`Delete "${a.name}"? This will also remove all contacts.`)) return;
-    setDeleting(a.id);
-    try { await deleteAccount(a.id); } finally { setDeleting(null); }
+  const handleDelete = (a) => {
+    setConfirmState({
+      title: 'Delete account',
+      message: `Delete "${a.name}"? This will also remove all contacts.`,
+      onConfirm: async () => {
+        setDeleting(a.id);
+        try { await deleteAccount(a.id); } finally { setDeleting(null); }
+      },
+    });
   };
 
   return (
@@ -114,6 +121,13 @@ function CRMContent() {
       )}
 
       <NewAccountModal open={modalOpen} onClose={() => setModalOpen(false)} onSave={createAccount} />
+      <ConfirmModal
+        open={!!confirmState}
+        title={confirmState?.title}
+        message={confirmState?.message}
+        onConfirm={() => { confirmState?.onConfirm(); setConfirmState(null); }}
+        onCancel={() => setConfirmState(null)}
+      />
     </div>
   );
 }

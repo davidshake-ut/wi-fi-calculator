@@ -6,6 +6,7 @@ import { getSupabase, isSupabaseConfigured } from '@/lib/supabase/client';
 import { useSession } from '@/components/SessionProvider';
 import { useBranding } from '@/hooks/useBranding';
 import { Card, Button, Field, TextInput, Select, Badge } from '@/components/ui/primitives';
+import ConfirmModal from '@/components/ui/ConfirmModal';
 import ModulesPanel from '@/components/ModulesPanel';
 import { cn } from '@/lib/utils';
 
@@ -318,6 +319,8 @@ export default function AdminPanel() {
   const [invite,  setInvite]  = useState({ email: '', role: 'user', companyId: '' });
   const [newTeam, setNewTeam] = useState({ name: '', adminEmail: '' });
 
+  const [confirmState, setConfirmState] = useState(null);
+
   // Super admin team branding state
   const [brandingTargetId, setBrandingTargetId] = useState('');
 
@@ -341,15 +344,20 @@ export default function AdminPanel() {
 
   const api = async (url, method, body) => {
     setErr(null); setMsg(null);
-    const res = await fetch(url, {
-      method,
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-      body: JSON.stringify(body),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) { flash('err', data.error || 'Request failed'); return false; }
-    await refresh();
-    return true;
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { flash('err', data.error || 'Request failed'); return false; }
+      await refresh();
+      return true;
+    } catch {
+      flash('err', 'Network error — check your connection and try again.');
+      return false;
+    }
   };
 
   const sendInvite = async (e, body) => {
@@ -361,27 +369,47 @@ export default function AdminPanel() {
   };
 
   const setRole      = (userId, role)      => api('/api/members', 'PATCH',  { userId, role });
-  const removeMember = async (m) => {
-    if (!confirm(`Remove ${m.email} from their team?`)) return;
-    if (await api('/api/members', 'DELETE', { userId: m.id })) flash('ok', `${m.email} removed.`);
+  const removeMember = (m) => {
+    setConfirmState({
+      title: 'Remove member',
+      message: `Remove ${m.email} from their team? They will lose access immediately.`,
+      confirmLabel: 'Remove',
+      onConfirm: async () => {
+        if (await api('/api/members', 'DELETE', { userId: m.id })) flash('ok', `${m.email} removed.`);
+      },
+    });
   };
 
   const createTeam = async (e) => {
     e.preventDefault(); setErr(null); setMsg(null);
-    const { data, error } = await supabase.from('companies').insert({ name: newTeam.name.trim() }).select().single();
-    if (error) return flash('err', error.message);
-    if (newTeam.adminEmail.trim()) {
-      await api('/api/invite', 'POST', { email: newTeam.adminEmail.trim(), role: 'company_admin', companyId: data.id });
+    try {
+      const { data, error } = await supabase.from('companies').insert({ name: newTeam.name.trim() }).select().single();
+      if (error) return flash('err', error.message);
+      if (newTeam.adminEmail.trim()) {
+        await api('/api/invite', 'POST', { email: newTeam.adminEmail.trim(), role: 'company_admin', companyId: data.id });
+      }
+      flash('ok', `Team "${data.name}" created${newTeam.adminEmail ? ' and first Admin invited' : ''}.`);
+      setNewTeam({ name: '', adminEmail: '' });
+    } catch {
+      flash('err', 'Network error — could not create team.');
     }
-    flash('ok', `Team "${data.name}" created${newTeam.adminEmail ? ' and first Admin invited' : ''}.`);
-    setNewTeam({ name: '', adminEmail: '' });
   };
 
-  const deleteTeam = async (c) => {
-    if (!confirm(`Delete team "${c.name}" and all its data? This cannot be undone.`)) return;
-    const { error } = await supabase.from('companies').delete().eq('id', c.id);
-    if (error) flash('err', error.message);
-    else { flash('ok', `Team "${c.name}" deleted.`); await refresh(); }
+  const deleteTeam = (c) => {
+    setConfirmState({
+      title: 'Delete team',
+      message: `Delete "${c.name}" and all its data? This cannot be undone.`,
+      confirmLabel: 'Delete Team',
+      onConfirm: async () => {
+        try {
+          const { error } = await supabase.from('companies').delete().eq('id', c.id);
+          if (error) flash('err', error.message);
+          else { flash('ok', `Team "${c.name}" deleted.`); await refresh(); }
+        } catch {
+          flash('err', 'Network error — could not delete team.');
+        }
+      },
+    });
   };
 
   const reassignTeam = async (userId, companyId) => {
@@ -482,7 +510,8 @@ export default function AdminPanel() {
 
               <div>
                 <h2 className="mb-3 text-sm font-semibold text-slate-800">All Teams</h2>
-                <table className="w-full text-sm">
+                <div className="overflow-x-auto">
+                <table className="w-full min-w-[400px] text-sm">
                   <thead>
                     <tr className="border-b border-slate-100 text-left text-xs text-slate-400">
                       <th className="py-2">Team</th>
@@ -515,6 +544,7 @@ export default function AdminPanel() {
                     )}
                   </tbody>
                 </table>
+                </div>
               </div>
 
               <div>
@@ -702,6 +732,15 @@ export default function AdminPanel() {
           )}
         </div>
       </Card>
+
+      <ConfirmModal
+        open={!!confirmState}
+        title={confirmState?.title}
+        message={confirmState?.message}
+        confirmLabel={confirmState?.confirmLabel}
+        onConfirm={() => { confirmState?.onConfirm(); setConfirmState(null); }}
+        onCancel={() => setConfirmState(null)}
+      />
     </div>
   );
 }

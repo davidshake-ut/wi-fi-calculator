@@ -32,6 +32,7 @@ import {
   Copy,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import ConfirmModal from '@/components/ui/ConfirmModal';
 
 function fmtDate(iso) {
   if (!iso) return null;
@@ -402,6 +403,7 @@ function SortableMilestoneBlock({
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.35 : 1 };
 
   const [collapsed, setCollapsed] = useState(false);
+  const [confirmState, setConfirmState] = useState(null);
   const done = tasks.filter((t) => t.status === 'done').length;
   const taskIds = tasks.map((t) => t.id);
   const otherSections = (techSections ?? []).filter((s) => s.id !== milestone.technology_id);
@@ -474,10 +476,11 @@ function SortableMilestoneBlock({
           <button
             type="button"
             title="Delete phase"
-            onClick={() => {
-              if (confirm(`Delete phase "${milestone.name}"? Tasks will become unassigned.`))
-                onDeleteMilestone(milestone.id);
-            }}
+            onClick={() => setConfirmState({
+              title: 'Delete phase',
+              message: `Delete phase "${milestone.name}"? Tasks will become unassigned.`,
+              onConfirm: () => onDeleteMilestone(milestone.id),
+            })}
             className="rounded p-1 text-slate-300 transition-colors hover:text-red-500"
           >
             <Trash2 size={13} />
@@ -508,6 +511,13 @@ function SortableMilestoneBlock({
           />
         </div>
       )}
+      <ConfirmModal
+        open={!!confirmState}
+        title={confirmState?.title}
+        message={confirmState?.message}
+        onConfirm={() => { confirmState?.onConfirm(); setConfirmState(null); }}
+        onCancel={() => setConfirmState(null)}
+      />
     </div>
   );
 }

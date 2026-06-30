@@ -19,6 +19,7 @@ import OSShell from '@/components/OSShell';
 import { useSession } from '@/components/SessionProvider';
 import { useTemplates } from '@/hooks/useTemplates';
 import { Card, Button, Field, TextInput, Select } from '@/components/ui/primitives';
+import ConfirmModal from '@/components/ui/ConfirmModal';
 import { TECHNOLOGIES } from '@/lib/templates/index';
 import { cn } from '@/lib/utils';
 
@@ -238,7 +239,7 @@ function TemplateCard({ template, canEdit, onClone, onDelete, onUpdateTemplate, 
           {canEdit && (
             <button
               type="button"
-              onClick={() => { if (confirm(`Delete template "${template.name}"?`)) onDelete(template.id); }}
+              onClick={() => onDelete(template.id, template.name)}
               className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-500"
             >
               <Trash2 size={14} />
@@ -358,6 +359,15 @@ function TemplatesContent() {
   const [techFilter, setTechFilter] = useState('');
   const [newModal, setNewModal] = useState(false);
   const [cloning, setCloning] = useState(null);
+  const [confirmState, setConfirmState] = useState(null);
+
+  const handleDeleteTemplate = (id, name) => {
+    setConfirmState({
+      title: 'Delete template',
+      message: `Delete "${name}"? This cannot be undone.`,
+      onConfirm: () => deleteTemplate(id),
+    });
+  };
 
   const handleClone = async (template) => {
     setCloning(template.id);
@@ -460,7 +470,7 @@ function TemplatesContent() {
               template={template}
               canEdit={!template.isSystem}
               onClone={handleClone}
-              onDelete={deleteTemplate}
+              onDelete={handleDeleteTemplate}
               onUpdateTemplate={updateTemplate}
               onAddPhase={addPhase}
               onUpdatePhase={updatePhase}
@@ -477,6 +487,13 @@ function TemplatesContent() {
         open={newModal}
         onClose={() => setNewModal(false)}
         onCreate={createTemplate}
+      />
+      <ConfirmModal
+        open={!!confirmState}
+        title={confirmState?.title}
+        message={confirmState?.message}
+        onConfirm={() => { confirmState?.onConfirm(); setConfirmState(null); }}
+        onCancel={() => setConfirmState(null)}
       />
     </div>
   );

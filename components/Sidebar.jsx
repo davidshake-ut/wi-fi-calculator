@@ -14,6 +14,7 @@ import {
   Layers,
   LayoutTemplate,
   Receipt,
+  X,
 } from 'lucide-react';
 import { useSession } from '@/components/SessionProvider';
 import { useModules } from '@/hooks/useModules';
@@ -30,10 +31,11 @@ const NAV_ITEMS = [
   { key: 'resources',  label: 'Resources',       href: '/resources',  icon: BookOpen },
 ];
 
-function NavLink({ href, icon: Icon, label, active }) {
+function NavLink({ href, icon: Icon, label, active, onClick }) {
   return (
     <Link
       href={href}
+      onClick={onClick}
       className={cn(
         'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
         active
@@ -47,7 +49,7 @@ function NavLink({ href, icon: Icon, label, active }) {
   );
 }
 
-export default function Sidebar() {
+export default function Sidebar({ onClose }) {
   const pathname = usePathname();
   const { isAdmin, isSuperAdmin, configured, session, signOut } = useSession();
   const { isEnabled } = useModules();
@@ -63,7 +65,16 @@ export default function Sidebar() {
         <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-600 text-white">
           <Layers size={14} />
         </span>
-        <span className="text-sm font-bold tracking-tight text-slate-900">FSG OS</span>
+        <span className="flex-1 text-sm font-bold tracking-tight text-slate-900">FSG OS</span>
+        {onClose && (
+          <button
+            onClick={onClose}
+            aria-label="Close navigation"
+            className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 md:hidden"
+          >
+            <X size={16} />
+          </button>
+        )}
       </div>
 
       {/* Primary nav */}
@@ -75,6 +86,7 @@ export default function Sidebar() {
             icon={icon}
             label={label}
             active={pathname === href || pathname.startsWith(href + '/')}
+            onClick={onClose}
           />
         ))}
       </nav>
@@ -87,6 +99,7 @@ export default function Sidebar() {
             icon={Shield}
             label={isSuperAdmin ? 'Platform Settings' : 'Settings'}
             active={pathname === '/admin'}
+            onClick={onClose}
           />
         )}
         {configured && session && (

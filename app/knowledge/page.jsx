@@ -12,6 +12,7 @@ import OSShell from '@/components/OSShell';
 import { useSession } from '@/components/SessionProvider';
 import { useKnowledgeBase } from '@/hooks/useKnowledgeBase';
 import { cn } from '@/lib/utils';
+import ConfirmModal from '@/components/ui/ConfirmModal';
 
 // ── Color system ─────────────────────────────────────────────────────────────
 // All class strings are literals so Tailwind JIT scans them correctly.
@@ -196,7 +197,7 @@ function GroupsSidebar({ groups, activeGroup, onSelect, onCreate, onUpdate, onDe
                   </div>
                   <button
                     type="button"
-                    onClick={() => { if (confirm(`Delete group "${g.name}"? Documents will become ungrouped.`)) { onDelete(g.id); setMenuOpen(null); } }}
+                    onClick={() => { onDelete(g.id, g.name); setMenuOpen(null); }}
                     className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs text-red-600 hover:bg-red-50"
                   >
                     <Trash2 size={11} /> Delete group
@@ -337,7 +338,7 @@ function DocCard({ doc, group, groups, onClick, onDelete, onMove }) {
             ))}
             <div className="my-1 border-t border-slate-100" />
             <button type="button"
-              onClick={() => { if (confirm(`Delete "${doc.name}"?`)) { onDelete(doc.id); setMenuOpen(false); } }}
+              onClick={() => { onDelete(doc.id, doc.name); setMenuOpen(false); }}
               className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs text-red-600 hover:bg-red-50">
               <Trash2 size={11} /> Delete
             </button>
@@ -428,7 +429,7 @@ function DocRow({ doc, group, groups, onClick, onDelete, onMove }) {
             ))}
             <div className="my-1 border-t border-slate-100" />
             <button type="button"
-              onClick={() => { if (confirm(`Delete "${doc.name}"?`)) { onDelete(doc.id); setMenuOpen(false); } }}
+              onClick={() => { onDelete(doc.id, doc.name); setMenuOpen(false); }}
               className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs text-red-600 hover:bg-red-50">
               <Trash2 size={11} /> Delete
             </button>
@@ -895,6 +896,22 @@ function KnowledgeContent() {
   const [createOpen,    setCreateOpen]    = useState(false);
   const [drawerWidth,  setDrawerWidth]  = useState(420);
   const [isResizing,   setIsResizing]   = useState(false);
+  const [confirmState, setConfirmState] = useState(null);
+
+  const handleDeleteGroup = (id, name) => {
+    setConfirmState({
+      title: 'Delete group',
+      message: `Delete group "${name}"? Documents will become ungrouped.`,
+      onConfirm: () => deleteGroup(id),
+    });
+  };
+  const handleDeleteDocument = (id, name) => {
+    setConfirmState({
+      title: 'Delete document',
+      message: `Delete "${name}"? This cannot be undone.`,
+      onConfirm: () => deleteDocument(id),
+    });
+  };
 
   const searchRef = useRef(null);
   const dragRef   = useRef(null); // { startX, startWidth }
@@ -999,7 +1016,7 @@ function KnowledgeContent() {
         onSelect={setActiveGroup}
         onCreate={createGroup}
         onUpdate={updateGroup}
-        onDelete={deleteGroup}
+        onDelete={handleDeleteGroup}
         docCounts={docCounts}
       />
 
@@ -1167,7 +1184,7 @@ function KnowledgeContent() {
                         group={groupById(doc.group_id)}
                         groups={groups}
                         onClick={() => setSelectedDoc(doc)}
-                        onDelete={deleteDocument}
+                        onDelete={handleDeleteDocument}
                         onMove={(id, gid) => updateDocument(id, { group_id: gid })}
                       />
                     ))}
@@ -1192,7 +1209,7 @@ function KnowledgeContent() {
                         group={groupById(doc.group_id)}
                         groups={groups}
                         onClick={() => setSelectedDoc(doc)}
-                        onDelete={deleteDocument}
+                        onDelete={handleDeleteDocument}
                         onMove={(id, gid) => updateDocument(id, { group_id: gid })}
                       />
                     ))}
@@ -1245,6 +1262,13 @@ function KnowledgeContent() {
           onClose={() => setCreateOpen(false)}
         />
       )}
+      <ConfirmModal
+        open={!!confirmState}
+        title={confirmState?.title}
+        message={confirmState?.message}
+        onConfirm={() => { confirmState?.onConfirm(); setConfirmState(null); }}
+        onCancel={() => setConfirmState(null)}
+      />
     </div>
   );
 }

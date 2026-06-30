@@ -35,6 +35,7 @@ export default function ProductDatabase({
   const [sortKey, setSortKey] = useState(null); // 'sku' | 'desc' | 'category'
   const [sortDir, setSortDir] = useState('asc');
   const [importing, setImporting] = useState(false);
+  const [notice, setNotice] = useState(null); // { type: 'error'|'success', message: string }
   const fileRef = useRef(null);
 
   const toggleSort = (key) => {
@@ -54,18 +55,17 @@ export default function ProductDatabase({
       const text = await file.text();
       const { products, errors } = parseCatalogCSV(text);
       if (products.length === 0) {
-        alert(`No products imported.\n\n${errors.join('\n') || 'No valid rows found.'}`);
+        setNotice({ type: 'error', message: `No products imported. ${errors.join(' ') || 'No valid rows found.'}` });
         return;
       }
       const res = await onImport(products);
       const summary = `Imported ${products.length} row(s): ${res.added} added, ${res.updated} updated.`;
-      alert(
-        errors.length
-          ? `${summary}\n\nSkipped ${errors.length} row(s):\n${errors.join('\n')}`
-          : summary
-      );
+      setNotice({
+        type: errors.length ? 'error' : 'success',
+        message: errors.length ? `${summary} Skipped ${errors.length} row(s): ${errors.join(' ')}` : summary,
+      });
     } catch (err) {
-      alert(`Import failed: ${err.message}`);
+      setNotice({ type: 'error', message: `Import failed: ${err.message}` });
     } finally {
       setImporting(false);
     }
@@ -194,6 +194,12 @@ export default function ProductDatabase({
         </div>
       </div>
 
+      {notice && (
+        <div className={`flex items-start justify-between gap-3 px-4 py-3 text-sm border-b ${notice.type === 'error' ? 'bg-red-50 text-red-700 border-red-100' : 'bg-emerald-50 text-emerald-700 border-emerald-100'}`}>
+          <span className="flex-1">{notice.message}</span>
+          <button type="button" onClick={() => setNotice(null)} className="shrink-0 opacity-60 hover:opacity-100">✕</button>
+        </div>
+      )}
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>

@@ -19,6 +19,8 @@ import CameraSystems from '@/components/CameraSystems';
 import ProductDatabase from '@/components/ProductDatabase';
 import ProductModal from '@/components/ProductModal';
 import { Button } from '@/components/ui/primitives';
+import ConfirmModal from '@/components/ui/ConfirmModal';
+import AppToast from '@/components/ui/AppToast';
 import { calculateBOM } from '@/lib/calculateBOM';
 import { calculateCameraBOM } from '@/lib/calculateCameraBOM';
 import { calculateLabor } from '@/lib/calculateLabor';
@@ -88,6 +90,8 @@ function Calculator() {
   const [newPsaProjectId, setNewPsaProjectId] = useState(null);
   const [toProjectBusy,  setToProjectBusy]  = useState(false);
   const [toProjectForm,  setToProjectForm]  = useState({ name: '', customer_name: '', start_date: '', budget: '' });
+  const [toast, setToast] = useState(null);
+  const [confirmState, setConfirmState] = useState(null);
 
   const canManageCatalog = configured
     ? (role === 'company_admin' || isSuperAdmin) &&
@@ -221,7 +225,7 @@ function Calculator() {
 
   const handleSave = async () => {
     if (!inputs.propertyName.trim()) {
-      alert('Enter a project / property name before saving.');
+      setToast({ type: 'error', message: 'Enter a project / property name before saving.' });
       return;
     }
     setBusy(true);
@@ -247,7 +251,7 @@ function Calculator() {
         laborRoles,
       });
     } catch (e) {
-      alert(`Save failed: ${e.message}`);
+      setToast({ type: 'error', message: `Save failed: ${e.message}` });
     } finally {
       setBusy(false);
     }
@@ -297,13 +301,15 @@ function Calculator() {
     else await addProduct(form);
   };
 
-  const removeCatalog = async (p) => {
-    if (!confirm(`Delete ${p.sku}?`)) return;
-    try {
-      await deleteProduct(p.sku);
-    } catch (e) {
-      alert(e.message);
-    }
+  const removeCatalog = (p) => {
+    setConfirmState({
+      title: 'Delete product',
+      message: `Delete ${p.sku} from the catalog?`,
+      onConfirm: async () => {
+        try { await deleteProduct(p.sku); }
+        catch (e) { setToast({ type: 'error', message: e.message }); }
+      },
+    });
   };
 
   const brandText = readableTextHex(branding.primaryColor);
@@ -520,7 +526,7 @@ function Calculator() {
               await setBranding(b);
               setSettingsOpen(false);
             } catch (e) {
-              alert(`Could not save branding: ${e.message}`);
+              setToast({ type: 'error', message: `Could not save branding: ${e.message}` });
             }
           }}
           onClose={() => setSettingsOpen(false)}
@@ -589,7 +595,7 @@ function Calculator() {
                     });
                     setNewPsaProjectId(proj.id);
                     setToProjectOpen(false);
-                  } catch (e) { alert(e.message); }
+                  } catch (e) { setToast({ type: 'error', message: e.message }); }
                   finally { setToProjectBusy(false); }
                 }}
                 className="flex items-center gap-1.5 rounded-xl bg-violet-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-60">
@@ -600,6 +606,14 @@ function Calculator() {
           </div>
         </div>
       )}
+      <ConfirmModal
+        open={!!confirmState}
+        title={confirmState?.title}
+        message={confirmState?.message}
+        onConfirm={() => { confirmState?.onConfirm(); setConfirmState(null); }}
+        onCancel={() => setConfirmState(null)}
+      />
+      <AppToast toast={toast} onDismiss={() => setToast(null)} />
     </div>
   );
 }
