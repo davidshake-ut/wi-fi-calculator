@@ -525,7 +525,6 @@ function Calculator() {
           onSave={saveCatalog}
         />
       )}
-      )}
 
       {/* Convert proposal → PSA project modal */}
       {toProjectOpen && (

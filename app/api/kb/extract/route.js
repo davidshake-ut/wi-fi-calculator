@@ -19,9 +19,10 @@ export async function POST(request) {
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
-    const pdfParse = (await import('pdf-parse/lib/pdf-parse.js')).default;
-    const data = await pdfParse(buffer);
-    return NextResponse.json({ text: data.text ?? '' });
+    const { PDFParse } = await import('pdf-parse');
+    const parser = new PDFParse({ data: new Uint8Array(buffer) });
+    const result = await parser.getText();
+    return NextResponse.json({ text: result.text ?? '' });
   } catch (err) {
     return NextResponse.json({ error: err.message ?? 'Extraction failed' }, { status: 500 });
   }
