@@ -51,7 +51,7 @@ function NavLink({ href, icon: Icon, label, active, onClick }) {
 
 export default function Sidebar({ onClose }) {
   const pathname = usePathname();
-  const { isAdmin, isSuperAdmin, configured, session, signOut } = useSession();
+  const { isAdmin, isSuperAdmin, role, configured, session, signOut } = useSession();
   const { isEnabled } = useModules();
 
   const visibleItems = NAV_ITEMS.filter((item) =>
@@ -93,7 +93,7 @@ export default function Sidebar({ onClose }) {
 
       {/* Bottom: Admin + Sign out */}
       <div className="space-y-0.5 border-t border-slate-200 p-2">
-        {isAdmin && (
+        {(isAdmin || role === 'user') && (
           <NavLink
             href="/admin"
             icon={Shield}

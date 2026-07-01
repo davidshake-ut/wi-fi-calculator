@@ -2,13 +2,12 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { getSupabase } from '@/lib/supabase/client';
-import { FileDown, FileText, Sheet, Save, Settings, FolderKanban, CheckCircle2, X, Loader2 } from 'lucide-react';
+import { FileDown, FileText, Sheet, Save, FolderKanban, CheckCircle2, X, Loader2 } from 'lucide-react';
 import AuthGuard from '@/components/AuthGuard';
 import OSShell from '@/components/OSShell';
 import { useSession } from '@/components/SessionProvider';
 import InputPanel from '@/components/InputPanel';
 import CameraInputPanel from '@/components/CameraInputPanel';
-import SettingsModal from '@/components/SettingsModal';
 import { useBranding } from '@/hooks/useBranding';
 import { readableTextHex } from '@/lib/colors';
 import SummaryCards from '@/components/SummaryCards';
@@ -61,7 +60,6 @@ function Calculator() {
   const [currentProjectId, setCurrentProjectId] = useState(null);
   const [savedSnapshot, setSavedSnapshot] = useState(null);
   const [modal, setModal] = useState({ open: false, product: null });
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [currentCrmAccountId, setCurrentCrmAccountId] = useState(null);
 
@@ -76,6 +74,20 @@ function Calculator() {
       setTeams(data || []);
     })();
   }, [isSuperAdmin, session]);
+
+  useEffect(() => {
+    try {
+      const defaults = JSON.parse(localStorage.getItem('fsg_builder_defaults') || 'null');
+      if (!defaults) return;
+      setInputs((prev) => ({
+        ...prev,
+        includeWifi:     defaults.includeWifi     ?? prev.includeWifi,
+        includeCameras:  defaults.includeCameras  ?? prev.includeCameras,
+        includeShipping: defaults.includeShipping ?? prev.includeShipping,
+        shippingPercent: defaults.shippingPercent ?? prev.shippingPercent,
+      }));
+    } catch {}
+  }, []);
 
   const { branding, setBranding } = useBranding({ configured, company, onSaved: refresh });
   const { accounts: crmAccounts, createAccount: createCrmAccount } = useCRMAccounts(session, company, user);
@@ -198,7 +210,14 @@ function Calculator() {
   const selectProject = (id) => {
     setNewPsaProjectId(null);
     if (!id) {
-      setInputs(DEFAULT_INPUTS);
+      const storedDefaults = (() => { try { return JSON.parse(localStorage.getItem('fsg_builder_defaults') || 'null'); } catch { return null; } })();
+      const techDefaults = storedDefaults ? {
+        includeWifi:     storedDefaults.includeWifi     ?? true,
+        includeCameras:  storedDefaults.includeCameras  ?? true,
+        includeShipping: storedDefaults.includeShipping ?? true,
+        shippingPercent: storedDefaults.shippingPercent ?? 7,
+      } : {};
+      setInputs({ ...DEFAULT_INPUTS, ...techDefaults });
       setCameraInputs(DEFAULT_CAMERA_INPUTS);
       setPriceOverrides({});
       setServiceOverrides({});
@@ -375,13 +394,6 @@ function Calculator() {
             <Button size="sm" onClick={handleExportProposal} title="Customer-facing proposal (sell price only)">
               <FileText size={14} /> Proposal
             </Button>
-            <button
-              onClick={() => setSettingsOpen(true)}
-              title="Settings (technologies, branding)"
-              className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 shadow-sm hover:bg-slate-50 hover:text-slate-700"
-            >
-              <Settings size={15} />
-            </button>
           </div>
         </div>
       </header>
@@ -513,25 +525,6 @@ function Calculator() {
           onSave={saveCatalog}
         />
       )}
-      {settingsOpen && (
-        <SettingsModal
-          branding={branding}
-          canManageBranding={canManageCatalog}
-          includeWifi={wifiEnabled}
-          includeCameras={camerasEnabled}
-          includeShipping={includeShipping}
-          shippingPercent={shippingPercent}
-          onSetInput={(key, val) => setInputs((prev) => ({ ...prev, [key]: val }))}
-          onSave={async (b) => {
-            try {
-              await setBranding(b);
-              setSettingsOpen(false);
-            } catch (e) {
-              setToast({ type: 'error', message: `Could not save branding: ${e.message}` });
-            }
-          }}
-          onClose={() => setSettingsOpen(false)}
-        />
       )}
 
       {/* Convert proposal → PSA project modal */}

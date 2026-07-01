@@ -275,6 +275,32 @@ export default function InputPanel({
 
   return (
     <div className="space-y-3">
+      <Section title="Systems">
+        <Toggle
+          checked={inputs.includeWifi !== false}
+          onChange={(v) => set('includeWifi', v)}
+          label="Managed Wi-Fi"
+        />
+        <Toggle
+          checked={inputs.includeCameras !== false}
+          onChange={(v) => set('includeCameras', v)}
+          label="Camera Systems"
+        />
+        <Toggle
+          checked={inputs.includeShipping !== false}
+          onChange={(v) => set('includeShipping', v)}
+          label="Estimate Shipping"
+        />
+        {inputs.includeShipping !== false && (
+          <Field label="Shipping (% of hardware)">
+            <NumberInput
+              value={inputs.shippingPercent ?? 7}
+              onChange={(v) => set('shippingPercent', v)}
+            />
+          </Field>
+        )}
+      </Section>
+
       <Section title="Property Information">
         <Field label="Customer">
           <CustomerPicker

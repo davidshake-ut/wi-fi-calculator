@@ -4,7 +4,7 @@ import AdminPanel from '@/components/AdminPanel';
 
 export default function AdminPage() {
   return (
-    <AuthGuard requireAdmin>
+    <AuthGuard>
       <OSShell>
         <AdminPanel />
       </OSShell>

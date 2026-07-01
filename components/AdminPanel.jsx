@@ -1,11 +1,11 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Trash2, UserPlus, Building2, Puzzle, Palette, Users, Upload, X } from 'lucide-react';
+import { Trash2, UserPlus, Building2, Puzzle, Palette, Users, Upload, X, SlidersHorizontal } from 'lucide-react';
 import { getSupabase, isSupabaseConfigured } from '@/lib/supabase/client';
 import { useSession } from '@/components/SessionProvider';
 import { useBranding } from '@/hooks/useBranding';
-import { Card, Button, Field, TextInput, Select, Badge } from '@/components/ui/primitives';
+import { Card, Button, Field, TextInput, Select, Badge, Toggle, NumberInput } from '@/components/ui/primitives';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 import ModulesPanel from '@/components/ModulesPanel';
 import { cn } from '@/lib/utils';
@@ -13,16 +13,22 @@ import { cn } from '@/lib/utils';
 // ── Tab definitions ────────────────────────────────────────────────────────
 
 const SA_TABS = [
-  { key: 'teams',    label: 'Teams',           Icon: Building2 },
-  { key: 'modules',  label: 'Module Settings', Icon: Puzzle    },
-  { key: 'branding', label: 'Team Branding',   Icon: Palette   },
-  { key: 'members',  label: 'Members',         Icon: Users     },
+  { key: 'teams',    label: 'Teams',           Icon: Building2          },
+  { key: 'modules',  label: 'Module Settings', Icon: Puzzle             },
+  { key: 'branding', label: 'Team Branding',   Icon: Palette            },
+  { key: 'members',  label: 'Members',         Icon: Users              },
+  { key: 'builder',  label: 'Builder',         Icon: SlidersHorizontal  },
 ];
 
 const CA_TABS = [
-  { key: 'branding', label: 'Branding',   Icon: Palette },
-  { key: 'modules',  label: 'Modules',    Icon: Puzzle  },
-  { key: 'members',  label: 'Members',    Icon: Users   },
+  { key: 'branding', label: 'Branding', Icon: Palette           },
+  { key: 'modules',  label: 'Modules',  Icon: Puzzle            },
+  { key: 'members',  label: 'Members',  Icon: Users             },
+  { key: 'builder',  label: 'Builder',  Icon: SlidersHorizontal },
+];
+
+const USER_TABS = [
+  { key: 'builder', label: 'Builder', Icon: SlidersHorizontal },
 ];
 
 // ── Branding form (shared by super admin + company admin) ─────────────────
@@ -278,6 +284,59 @@ function MembersTable({ members, companies, selfId, onRole, onRemove, onReassign
   );
 }
 
+// ── Builder defaults ──────────────────────────────────────────────────────
+
+const BUILDER_DEFAULTS_KEY = 'fsg_builder_defaults';
+
+function BuilderDefaultsForm() {
+  const [form, setForm] = useState({ includeWifi: true, includeCameras: true, includeShipping: true, shippingPercent: 7 });
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem(BUILDER_DEFAULTS_KEY) || 'null');
+      if (stored) setForm((f) => ({ ...f, ...stored }));
+    } catch {}
+  }, []);
+
+  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  const save = () => {
+    localStorage.setItem(BUILDER_DEFAULTS_KEY, JSON.stringify(form));
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2500);
+  };
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h3 className="mb-0.5 text-sm font-semibold text-slate-800">Technologies</h3>
+        <p className="text-xs text-slate-400">Which systems are enabled by default when starting a new project.</p>
+      </div>
+      <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3 space-y-3">
+        <Toggle checked={form.includeWifi} onChange={(v) => set('includeWifi', v)} label="Managed Wi-Fi" />
+        <Toggle checked={form.includeCameras} onChange={(v) => set('includeCameras', v)} label="Camera Systems" />
+      </div>
+      <div>
+        <h3 className="mb-0.5 text-sm font-semibold text-slate-800">Shipping</h3>
+        <p className="text-xs text-slate-400">Default shipping estimate for new projects.</p>
+      </div>
+      <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3 space-y-3">
+        <Toggle checked={form.includeShipping} onChange={(v) => set('includeShipping', v)} label="Add Shipping Estimate" />
+        {form.includeShipping && (
+          <Field label="Shipping (% of hardware)">
+            <NumberInput value={form.shippingPercent} onChange={(v) => set('shippingPercent', v)} />
+          </Field>
+        )}
+      </div>
+      <div className="flex items-center gap-3">
+        <Button type="button" onClick={save}>Save Defaults</Button>
+        {saved && <span className="text-sm text-emerald-600">Saved!</span>}
+      </div>
+    </div>
+  );
+}
+
 // ── Tab bar ───────────────────────────────────────────────────────────────
 
 function TabBar({ tabs, active, onChange }) {
@@ -286,6 +345,7 @@ function TabBar({ tabs, active, onChange }) {
       {tabs.map(({ key, label, Icon }) => (
         <button
           key={key}
+          type="button"
           onClick={() => onChange(key)}
           className={cn(
             'flex items-center gap-1.5 rounded-t-lg px-4 py-2.5 text-sm font-medium transition-colors',
@@ -306,9 +366,9 @@ function TabBar({ tabs, active, onChange }) {
 
 export default function AdminPanel() {
   const supabase = getSupabase();
-  const { session, isSuperAdmin, company, user, refresh: refreshSession } = useSession();
+  const { session, isSuperAdmin, isAdmin, company, user, role, refresh: refreshSession } = useSession();
 
-  const tabs    = isSuperAdmin ? SA_TABS : CA_TABS;
+  const tabs = isSuperAdmin ? SA_TABS : isAdmin ? CA_TABS : USER_TABS;
   const [activeTab, setActiveTab] = useState(tabs[0].key);
 
   const [companies, setCompanies] = useState([]);
@@ -458,12 +518,14 @@ export default function AdminPanel() {
     <div className="mx-auto max-w-5xl space-y-4 p-4 sm:p-6">
       <div>
         <h1 className="text-xl font-semibold text-slate-900">
-          {isSuperAdmin ? 'Platform Settings' : 'Team Settings'}
+          {isSuperAdmin ? 'Platform Settings' : isAdmin ? 'Team Settings' : 'Settings'}
         </h1>
         <p className="mt-1 text-sm text-slate-500">
           {isSuperAdmin
             ? 'Manage teams, configure modules, and set team branding across the platform.'
-            : "Configure your team's branding, modules, and members."}
+            : isAdmin
+            ? "Configure your team's branding, modules, and members."
+            : 'Configure your default project settings.'}
         </p>
       </div>
 
@@ -729,6 +791,11 @@ export default function AdminPanel() {
                 />
               </div>
             </div>
+          )}
+
+          {/* ── BUILDER DEFAULTS ───────────────────────────────────── */}
+          {activeTab === 'builder' && (
+            <BuilderDefaultsForm />
           )}
         </div>
       </Card>
