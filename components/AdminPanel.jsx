@@ -416,7 +416,7 @@ export default function AdminPanel() {
     const { error } = await supabase.from('users').update({ company_id: companyId || null }).eq('id', userId);
     if (error) return flash('err', error.message);
     await refresh();
-    if (userId === user?.id) await refreshSession?.();
+    if (userId === user?.id) await refreshSession?.().catch(() => {});
   };
 
   const memberCount = (cid) => members.filter((m) => m.company_id === cid).length;

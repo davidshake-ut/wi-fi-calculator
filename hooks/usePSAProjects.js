@@ -17,25 +17,27 @@ export function usePSAProjects(session, company, user) {
   const [remoteProjects, setRemoteProjects] = useState([]);
   const [loading, setLoading] = useState(false);
 
+  const companyId = company?.id;
   const projects = supabase ? remoteProjects : localData.projects;
 
   const refresh = useCallback(async () => {
-    if (!supabase) return;
+    if (!supabase || !companyId) return;
     setLoading(true);
     const { data } = await supabase
       .from('psa_projects')
       .select('*, saved_projects(project_name)')
+      .eq('company_id', companyId)
       .order('created_at', { ascending: false });
     setRemoteProjects(data || []);
     setLoading(false);
-  }, [supabase]);
+  }, [supabase, companyId]);
 
   useEffect(() => {
-    if (!isSupabaseConfigured || !supabase || !session) return;
+    if (!isSupabaseConfigured || !supabase || !session || !companyId) return;
     void (async () => {
       await refresh();
     })();
-  }, [supabase, session, refresh]);
+  }, [supabase, session, companyId, refresh]);
 
   const createProject = useCallback(
     async ({ technologies = [], ...data }) => {

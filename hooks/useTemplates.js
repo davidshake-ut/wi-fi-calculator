@@ -20,6 +20,7 @@ export function useTemplates(session, company, user) {
     const { data: templates } = await supabase
       .from('project_templates')
       .select('*, template_phases(*, template_tasks(*))')
+      .eq('company_id', companyId)
       .order('name');
     setCompanyTemplates(templates ?? []);
     setLoading(false);

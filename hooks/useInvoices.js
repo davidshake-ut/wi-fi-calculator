@@ -26,6 +26,7 @@ export function useInvoices(session, company, user) {
     const { data } = await supabase
       .from('invoices')
       .select('*, psa_projects(name), saved_projects(project_name), crm_accounts(name)')
+      .eq('company_id', companyId)
       .order('created_at', { ascending: false });
     setInvoices(data ?? []);
     setLoading(false);

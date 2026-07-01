@@ -19,6 +19,7 @@ export function useSupportTickets(session, company, user) {
     const { data } = await supabase
       .from('support_tickets')
       .select('*, crm_accounts(name)')
+      .eq('company_id', companyId)
       .order('created_at', { ascending: false });
     setRemoteTickets(data ?? []);
     setLoading(false);

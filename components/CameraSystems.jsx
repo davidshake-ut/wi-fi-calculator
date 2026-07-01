@@ -48,7 +48,8 @@ export default function CameraSystems({
           />
 
           <Card className="overflow-hidden">
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto">
+            <table className="w-full min-w-[280px] text-sm">
               <tbody>
                 <tr className="border-b border-slate-50">
                   <td className="px-4 py-2.5 text-slate-700">Hardware Subtotal</td>
@@ -76,6 +77,7 @@ export default function CameraSystems({
                 </tr>
               </tfoot>
             </table>
+            </div>
           </Card>
 
           <p className="px-1 text-xs italic text-slate-400">

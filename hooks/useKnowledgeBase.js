@@ -64,10 +64,12 @@ export function useKnowledgeBase(session, company) {
   const refresh = useCallback(async () => {
     if (!supabase || !company?.id) return;
     setLoading(true);
+    const companyId = company.id;
     const [gr, dr] = await Promise.all([
-      supabase.from('kb_groups').select('*').order('order_index').order('created_at'),
+      supabase.from('kb_groups').select('*').eq('company_id', companyId).order('order_index').order('created_at'),
       supabase.from('kb_documents')
         .select('id,name,description,group_id,file_type,file_size,file_path,tags,created_at,updated_at')
+        .eq('company_id', companyId)
         .order('created_at', { ascending: false }),
     ]);
     setGroups(gr.data ?? []);
