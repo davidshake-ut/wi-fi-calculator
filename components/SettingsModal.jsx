@@ -93,7 +93,7 @@ export default function SettingsModal({
       >
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-base font-semibold text-slate-800">Settings</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-700">
+          <button type="button" onClick={onClose} aria-label="Close settings" className="text-slate-400 hover:text-slate-700">
             <X size={18} />
           </button>
         </div>

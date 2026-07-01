@@ -71,7 +71,7 @@ export default function ProductModal({ open, product, clone = false, onClose, on
       >
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-sm font-semibold text-slate-800">{title}</h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-700">
+          <button type="button" onClick={onClose} aria-label="Close" className="text-slate-400 hover:text-slate-700">
             <X size={18} />
           </button>
         </div>

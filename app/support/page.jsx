@@ -12,6 +12,7 @@ import NewTicketModal from '@/components/support/NewTicketModal';
 import TicketPriorityBadge, { TicketStatusBadge, STATUS_CONFIG } from '@/components/support/TicketPriorityBadge';
 import { Card, Button } from '@/components/ui/primitives';
 import ConfirmModal from '@/components/ui/ConfirmModal';
+import AppToast from '@/components/ui/AppToast';
 import { cn } from '@/lib/utils';
 
 const ALL_STATUSES = Object.keys(STATUS_CONFIG);
@@ -34,6 +35,7 @@ function SupportContent() {
   const [modalOpen, setModalOpen] = useState(false);
   const [deleting, setDeleting] = useState(null);
   const [confirmState, setConfirmState] = useState(null);
+  const [toast, setToast] = useState(null);
 
   const filtered = statusFilter === 'all' ? tickets : tickets.filter((t) => t.status === statusFilter);
 
@@ -133,7 +135,7 @@ function SupportContent() {
         </div>
       )}
 
-      <NewTicketModal open={modalOpen} onClose={() => setModalOpen(false)} onSave={createTicket} accounts={accounts} />
+      <NewTicketModal open={modalOpen} onClose={() => setModalOpen(false)} onSave={async (d) => { await createTicket(d); setToast({ type: 'success', message: 'Ticket created.' }); }} accounts={accounts} />
       <ConfirmModal
         open={!!confirmState}
         title={confirmState?.title}
@@ -141,6 +143,7 @@ function SupportContent() {
         onConfirm={() => { confirmState?.onConfirm(); setConfirmState(null); }}
         onCancel={() => setConfirmState(null)}
       />
+      <AppToast toast={toast} onDismiss={() => setToast(null)} />
     </div>
   );
 }

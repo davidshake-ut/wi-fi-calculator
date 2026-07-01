@@ -63,8 +63,8 @@ function EditableTechName({ value, onSave }) {
           onKeyDown={(e) => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setEditing(false); }}
           className="rounded-full border border-blue-400 bg-white px-3 py-0.5 text-sm font-semibold text-blue-700 outline-none ring-2 ring-blue-400/20"
         />
-        <button onClick={commit} className="rounded p-1 text-emerald-600 hover:bg-emerald-50"><Check size={13} /></button>
-        <button onClick={() => setEditing(false)} className="rounded p-1 text-slate-400 hover:bg-slate-100"><X size={13} /></button>
+        <button type="button" onClick={commit} aria-label="Save" className="rounded p-1 text-emerald-600 hover:bg-emerald-50"><Check size={13} /></button>
+        <button type="button" onClick={() => setEditing(false)} aria-label="Cancel" className="rounded p-1 text-slate-400 hover:bg-slate-100"><X size={13} /></button>
       </div>
     );
   }

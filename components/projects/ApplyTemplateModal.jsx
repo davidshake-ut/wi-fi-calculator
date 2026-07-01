@@ -77,7 +77,7 @@ function PhasePreview({ phase, schedule }) {
           {phase.tasks.map((task, i) => {
             const span = schedule?.taskSpans[i];
             return (
-              <div key={i} className="rounded-md bg-white p-2 text-xs">
+              <div key={task.id ?? task.name ?? i} className="rounded-md bg-white p-2 text-xs">
                 <div className="flex items-center gap-2">
                   <span className="font-medium text-slate-700">{task.name}</span>
                   <div className="ml-auto flex items-center gap-2 text-slate-400">

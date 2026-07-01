@@ -25,6 +25,7 @@ import ProjectStatusBadge, { STATUS_CONFIG } from '@/components/projects/Project
 import NewProjectModal from '@/components/projects/NewProjectModal';
 import { Card, Button } from '@/components/ui/primitives';
 import ConfirmModal from '@/components/ui/ConfirmModal';
+import AppToast from '@/components/ui/AppToast';
 import { cn } from '@/lib/utils';
 
 const ALL_STATUSES = Object.keys(STATUS_CONFIG);
@@ -104,7 +105,7 @@ function CreateInvoiceModal({ project, onSave, onClose }) {
           <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 space-y-2">
             <p className="text-xs font-medium text-slate-600">Line Items</p>
             {form.line_items.map((item, i) => (
-              <div key={i} className="grid grid-cols-[1fr_90px_28px] gap-2 items-center">
+              <div key={item.id ?? i} className="grid grid-cols-[1fr_90px_28px] gap-2 items-center">
                 <input value={item.description} onChange={(e) => {
                   const next = form.line_items.map((it,idx) => idx===i ? {...it,description:e.target.value} : it);
                   set('line_items', next);
@@ -153,6 +154,7 @@ function ProjectsContent() {
   const [deleting,      setDeleting]      = useState(null);
   const [invoiceTarget, setInvoiceTarget] = useState(null);
   const [confirmState,  setConfirmState]  = useState(null);
+  const [toast, setToast] = useState(null);
 
   const filtered = statusFilter === 'all'
     ? projects
@@ -290,7 +292,7 @@ function ProjectsContent() {
       <NewProjectModal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
-        onSave={createProject}
+        onSave={async (d) => { await createProject(d); setToast({ type: 'success', message: 'Project created.' }); }}
         quotes={quotes}
       />
       {invoiceTarget && (
@@ -299,6 +301,7 @@ function ProjectsContent() {
           onSave={async (data) => {
             await createInvoice(data);
             setInvoiceTarget(null);
+            setToast({ type: 'success', message: 'Invoice created.' });
           }}
           onClose={() => setInvoiceTarget(null)}
         />
@@ -310,6 +313,7 @@ function ProjectsContent() {
         onConfirm={() => { confirmState?.onConfirm(); setConfirmState(null); }}
         onCancel={() => setConfirmState(null)}
       />
+      <AppToast toast={toast} onDismiss={() => setToast(null)} />
     </div>
   );
 }

@@ -10,6 +10,7 @@ import { useCRMAccounts } from '@/hooks/useCRMAccounts';
 import NewAccountModal from '@/components/crm/NewAccountModal';
 import { Card, Button } from '@/components/ui/primitives';
 import ConfirmModal from '@/components/ui/ConfirmModal';
+import AppToast from '@/components/ui/AppToast';
 import { cn } from '@/lib/utils';
 
 const TYPE_LABELS = {
@@ -32,6 +33,7 @@ function CRMContent() {
   const [modalOpen, setModalOpen] = useState(false);
   const [deleting, setDeleting] = useState(null);
   const [confirmState, setConfirmState] = useState(null);
+  const [toast, setToast] = useState(null);
 
   const filtered = accounts.filter((a) => {
     const matchSearch = !search || a.name.toLowerCase().includes(search.toLowerCase());
@@ -120,7 +122,7 @@ function CRMContent() {
         </div>
       )}
 
-      <NewAccountModal open={modalOpen} onClose={() => setModalOpen(false)} onSave={createAccount} />
+      <NewAccountModal open={modalOpen} onClose={() => setModalOpen(false)} onSave={async (d) => { await createAccount(d); setToast({ type: 'success', message: 'Account created.' }); }} />
       <ConfirmModal
         open={!!confirmState}
         title={confirmState?.title}
@@ -128,6 +130,7 @@ function CRMContent() {
         onConfirm={() => { confirmState?.onConfirm(); setConfirmState(null); }}
         onCancel={() => setConfirmState(null)}
       />
+      <AppToast toast={toast} onDismiss={() => setToast(null)} />
     </div>
   );
 }

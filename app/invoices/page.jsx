@@ -377,7 +377,7 @@ function InvoiceDetail({ invoice: inv, onClose, onUpdate, onDelete }) {
                   {lineItems.length === 0 ? (
                     <tr><td colSpan={4} className="px-4 py-6 text-center text-sm text-slate-300">No line items</td></tr>
                   ) : lineItems.map((item, i) => (
-                    <tr key={i} className="border-b border-slate-100 last:border-0">
+                    <tr key={item.id ?? i} className="border-b border-slate-100 last:border-0">
                       <td className="px-4 py-2.5 text-sm text-slate-700">{item.description}</td>
                       <td className="px-4 py-2.5 text-right text-sm tabular-nums text-slate-500">{item.qty}</td>
                       <td className="px-4 py-2.5 text-right text-sm tabular-nums text-slate-500">{fmtMoney(item.unit_price)}</td>

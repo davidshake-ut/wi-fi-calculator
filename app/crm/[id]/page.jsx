@@ -10,6 +10,7 @@ import { useSession } from '@/components/SessionProvider';
 import { useCRMAccount } from '@/hooks/useCRMAccount';
 import ContactSection from '@/components/crm/ContactSection';
 import { Select, Button } from '@/components/ui/primitives';
+import AppToast from '@/components/ui/AppToast';
 import { cn } from '@/lib/utils';
 
 const STATUS_STYLES = {
@@ -43,8 +44,8 @@ function EditableField({ label, value, onSave, type = 'text', placeholder }) {
             onKeyDown={(e) => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setEditing(false); }}
             placeholder={placeholder}
             className="flex-1 rounded-lg border border-blue-400 px-2 py-1 text-sm outline-none ring-2 ring-blue-500/20" />
-          <button onClick={commit} className="rounded p-1 text-emerald-600 hover:bg-emerald-50"><Check size={14} /></button>
-          <button onClick={() => setEditing(false)} className="rounded p-1 text-slate-400 hover:bg-slate-100"><X size={14} /></button>
+          <button type="button" onClick={commit} aria-label="Save" className="rounded p-1 text-emerald-600 hover:bg-emerald-50"><Check size={14} /></button>
+          <button type="button" onClick={() => setEditing(false)} aria-label="Cancel" className="rounded p-1 text-slate-400 hover:bg-slate-100"><X size={14} /></button>
         </div>
       </div>
     );
@@ -52,7 +53,7 @@ function EditableField({ label, value, onSave, type = 'text', placeholder }) {
   return (
     <div>
       <p className="mb-0.5 text-xs font-medium text-slate-400">{label}</p>
-      <button onClick={() => { setDraft(value ?? ''); setEditing(true); }}
+      <button type="button" onClick={() => { setDraft(value ?? ''); setEditing(true); }} aria-label={`Edit ${label}`}
         className="group flex items-center gap-1 text-sm text-slate-700 hover:text-blue-600">
         {value || <span className="text-slate-300 italic">—</span>}
         <Pencil size={11} className="opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -114,6 +115,8 @@ function AccountDetail() {
   const { session } = useSession();
   const { account, contacts, loading, updateAccount, createContact, deleteContact } = useCRMAccount(id, session);
   const [tab, setTab] = useState('contacts');
+  const [toast, setToast] = useState(null);
+  const save = async (patch) => { await updateAccount(patch); setToast({ type: 'success', message: 'Saved.' }); };
 
   if (loading) {
     return <div className="flex h-64 items-center justify-center gap-2 text-slate-400"><Loader2 className="animate-spin" size={18} /> Loading…</div>;
@@ -143,7 +146,7 @@ function AccountDetail() {
             <p className="text-xs text-slate-500">{TYPE_LABELS[account.type] ?? account.type}</p>
           </div>
           <Select className="h-8 w-32 text-xs" value={account.status}
-            onChange={(e) => updateAccount({ status: e.target.value })}>
+            onChange={(e) => save({ status: e.target.value })}>
             <option value="prospect">Prospect</option>
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
@@ -165,13 +168,14 @@ function AccountDetail() {
         )}
         {tab === 'overview' && (
           <div className="max-w-lg rounded-xl border border-slate-200 bg-white p-5 space-y-4">
-            <EditableField label="Phone" value={account.phone} onSave={(v) => updateAccount({ phone: v })} type="tel" placeholder="(555) 000-0000" />
-            <EditableField label="Website" value={account.website} onSave={(v) => updateAccount({ website: v })} placeholder="https://…" />
-            <EditableField label="Address" value={account.address} onSave={(v) => updateAccount({ address: v })} placeholder="123 Main St…" />
-            <EditableTextarea label="Notes" value={account.notes} onSave={(v) => updateAccount({ notes: v })} placeholder="Add notes about this account…" />
+            <EditableField label="Phone" value={account.phone} onSave={(v) => save({ phone: v })} type="tel" placeholder="(555) 000-0000" />
+            <EditableField label="Website" value={account.website} onSave={(v) => save({ website: v })} placeholder="https://…" />
+            <EditableField label="Address" value={account.address} onSave={(v) => save({ address: v })} placeholder="123 Main St…" />
+            <EditableTextarea label="Notes" value={account.notes} onSave={(v) => save({ notes: v })} placeholder="Add notes about this account…" />
           </div>
         )}
       </div>
+      <AppToast toast={toast} onDismiss={() => setToast(null)} />
     </div>
   );
 }

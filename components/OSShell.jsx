@@ -27,6 +27,7 @@ export default function OSShell({ children }) {
         {/* Mobile top bar */}
         <div className="flex items-center gap-3 border-b border-slate-200 px-4 py-3 md:hidden bg-white">
           <button
+            type="button"
             onClick={() => setMobileOpen(true)}
             aria-label="Open navigation"
             className="rounded-lg p-1.5 text-slate-600 hover:bg-slate-100"

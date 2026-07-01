@@ -24,6 +24,7 @@ export default function ConfirmModal({ open, title, message, confirmLabel = 'Del
       <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px]" onClick={onCancel} />
       <div className="relative w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-6 shadow-xl">
         <button
+          type="button"
           onClick={onCancel}
           aria-label="Cancel"
           className="absolute right-4 top-4 rounded-lg p-1 text-slate-400 hover:bg-slate-100"

@@ -250,6 +250,7 @@ function Calculator() {
         customLineItems,
         laborRoles,
       });
+      setToast({ type: 'success', message: 'Project saved.' });
     } catch (e) {
       setToast({ type: 'error', message: `Save failed: ${e.message}` });
     } finally {

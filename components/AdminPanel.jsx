@@ -182,7 +182,7 @@ function BrandingForm({ initial, onSave }) {
             Accent
           </span>
           {form.logo?.dataUrl && (
-            <img src={form.logo.dataUrl} alt="" className="ml-auto h-7 w-auto object-contain" />
+            <img src={form.logo.dataUrl} alt="Company logo" className="ml-auto h-7 w-auto object-contain" />
           )}
         </div>
       </div>
